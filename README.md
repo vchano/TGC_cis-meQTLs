@@ -28,7 +28,7 @@ scripts/
 ├── TBS/     # Bisulfite sequencing: QC → trimming → mapping →
              #   methylation extraction → filtering → methylation analysis
 └── JOINT/   # Joint analyses: meQTL mapping, Manhattan plots,
-             #   overlap analysis, figure/table export
+             #   overlap analysis, annotation, summary tables
 ```
 
 ## Pipeline Steps
@@ -45,9 +45,9 @@ scripts/
 | 5a | `5a.tgc.ecs.plink.admixture.split.gwasprep.sh` | PLINK + ADMIXTURE |
 | 6a | `6a.tgc.ecs.beagle.imputation.sh` | BEAGLE imputation |
 | 7a | `7a.tgc.ecs.plink.ibd.sh` | IBD estimation |
-| 8a | `8a.tgc.ecs.orchestrator.R` | GDS construction |
+| 8a | `8a.tgc.ecs.orchestrator.R` | GDS construction, GRM, kinship |
 | 9a | `9a.tgc.ecs.pca.R` | Principal component analysis |
-| 10a | `10a.tgc.ecs.grm.ibd.dapc.biplot.R` | GRM, IBD, DAPC |
+| 10a | `10a.tgc.ecs.grm.ibd.dapc.biplot.R` | GRM, IBD, DAPC figures |
 
 ### TBS (DNA methylation)
 
@@ -58,7 +58,7 @@ scripts/
 | 3b | `3b.tgc.tbs.bismark.trimmed.sh` | Bismark alignment |
 | 4b1 | `4b1.tgc.tbs.meth.extractor.array.sh` | Methylation extraction |
 | 4b2 | `4b2.tgc.tbs.meth.filtering.array.sh` | Coverage filtering |
-| 5b | `5b.tgc.methylkit.filtering.sh` / `5b.tgc.tbs.import.data.methylkit.R` | methylKit import |
+| 5b | `5b.tgc.methylkit.filtering.sh` / `5b.tgc.tbs.import.data.methylkit.R` | methylKit import and filtering |
 | 6b | `6b.tgc.tbs.methylation.levels.anova.R` | Methylation level ANOVAs |
 | 7b | `7b.tgc.tbs.pcs.dapc.heatmaps.R` | PCA, DAPC, heatmaps |
 | 8b | `8b.tgc.tbs.heatmaps.R` | Heatmap figures |
@@ -68,26 +68,38 @@ scripts/
 | Step | Script | Description |
 |------|--------|-------------|
 | 11ab | `11ab.tgc.joint.correlation.analysis.R` | ECS–TBS correlation |
-| 16ab0–2 | `16ab0.R` – `16ab2.R` | meQTL input preparation |
-| 16ab3 | `16ab3.R` | meQTL mapping (GENESIS + MatrixEQTL) |
-| 16ab4 | `16ab4.R` | Circular Manhattan plots |
-| 16ab5 | `16ab5.R` / `16ab5.sh` | Venn overlap analysis |
-| 16ab6 | `16ab6.R` / `16ab6.sh` | Panel figure assembly |
-| 17ab | `17ab.R` / `17ab.sh` | Additional summaries |
-| 19ab | `19ab_export_figures_tables.R` / `19ab_export_figures_tables.sh` | Figure and table export |
-| 20ab | `20ab_summary_tables.R` | ECS/TBS summary tables |
+| 12ab0 | `12ab0.tgc.joint.meqtl.input.prep.R` | meQTL input preparation (M-values, GRM, PCs) |
+| 12ab1 | `12ab1.tgc.joint.matrixeqtl.mapping.R` | MatrixEQTL cis-meQTL mapping (linear model) |
+| 12ab2 | `12ab2.tgc.joint.genesis.mapping.R` | GENESIS cis-meQTL mapping (LMM + GRM) |
+| 13ab | `13ab.tgc.joint.meqtl.combined.results.R` | Combined results, QQ plots, summary tables |
+| 14ab | `14ab.tgc.joint.manhattan.plots.R` | Circular Manhattan plots |
+| 15ab | `15ab.tgc.joint.venn.overlap.R` / `.sh` | Overlap analysis across tools and contexts |
+| 16ab | `16ab.tgc.joint.panel.assembly.R` / `.sh` | Multi-panel figure assembly |
+| 17ab | `17ab.tgc.joint.marker.annotation.R` / `.sh` | Marker annotation against reference GFF3 |
+| 18ab | `18ab.tgc.joint.summary.tables.R` | Manuscript summary tables (ECS + TBS) |
 
 ## Dependencies
 
-**Tools (via SLURM modules):**
-- `gcc/14.2.0`, `r/4.5.2`, `imagemagick/7.1.1-39`
-- FastQC, Trimmomatic, Bowtie2, Bismark, bcftools, vcftools, PLINK, BEAGLE
+**Tools (via HPC modules):**
+- FastQC, MultiQC, Trimmomatic
+- Bowtie2, Bismark, SAMtools
+- bcftools, vcftools, PLINK 1.9, BEAGLE
+- R 4.5.2, ImageMagick
 
 **R packages:**
-- `data.table`, `GENESIS`, `MatrixEQTL`, `SeqArray`, `SeqVarTools`
-- `ggplot2`, `circlize`, `methylKit`, `SNPRelate`, `MASS`, `adegenet`
+- `data.table`, `SNPRelate`, `gdsfmt`, `SeqArray`, `SeqVarTools`
+- `GENESIS`, `MatrixEQTL`
+- `methylKit`
+- `ggplot2`, `circlize`, `adegenet`, `MASS`
 
-## Data Availability
+## Quick start
+
+1. Set `PROJECT_ROOT` at the top of each script to your local project directory.
+2. Adapt SLURM directives (`--account`, `--partition`, `--mail-user`) for your cluster.
+3. Run scripts in the order listed above. ECS and TBS steps (1a–10a, 1b–8b) can
+   be run in parallel; joint steps (11ab–18ab) require both to be complete first.
+
+## Data availability
 
 | Data type | Repository | Accession |
 |-----------|-----------|-----------|
