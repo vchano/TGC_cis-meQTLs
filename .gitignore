@@ -1,0 +1,50 @@
+# R
+.Rhistory
+.RData
+.Rproj.user/
+*.Rproj
+
+# Large data files — never commit these; deposit in SRA / GEO / GRO.data
+*.fastq.gz
+*.fq.gz
+*.bam
+*.sam
+*.bai
+*.csi
+*.vcf
+*.vcf.gz
+*.bcf
+*.gds
+*.rds
+*.RDS
+
+# Compressed archives
+*.tar.gz
+*.zip
+*.gz
+
+# SLURM logs
+*_err.txt
+*_out.txt
+*.out
+*.err
+slurm-*.out
+
+# Figure outputs (deposited separately)
+*.tiff
+*.tif
+*.pdf
+*.eps
+*.png
+Rplots.pdf
+
+# Tables and results (deposited separately)
+*.tsv
+*.csv
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+*~
+.vscode/
+.idea/
