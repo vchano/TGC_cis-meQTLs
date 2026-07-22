@@ -353,8 +353,10 @@ cat("RDS dir:  ", rds_dir, "\n", sep = "")
 cat("Fig dir:  ", fig_dir, "\n", sep = "")
 cat("Log dir:  ", log_dir, "\n\n", sep = "")
 
-# Use MEF-filtered datasets (cov+unite+MEF). Flip to FALSE if you want cov-only.
-prefer_mef <- TRUE
+# Global methylation levels must be estimated from all covered loci (cov+unite),
+# NOT from the MEF-filtered subset, which selects variable sites and inflates means.
+# MEF-filtered data is used downstream for SVMP analysis (Step 8b) only.
+prefer_mef <- FALSE
 
 # BREEDING -> panels a/c/e (left column, per context)
 res_b_CpG <- analyze_one_clean("BREEDING", "CpG", map_file_breeding, colors.17, "FIG3a_BREEDING", "a)",
