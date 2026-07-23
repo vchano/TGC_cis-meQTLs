@@ -6,7 +6,7 @@ This repository contains all scripts used for cis-methylation quantitative trait
 locus (cis-meQTL) mapping in *Picea abies* (Norway spruce), integrating:
 
 - **ECS** — Exome Capture Sequencing (SNP genotyping)
-- **TBS** — Targeted Bisulfite Sequencing (DNA methylation)
+- **TMS** — Target-enriched Enzymatic Methylation Sequencing (DNA methylation)
 
 Two cohorts were analyzed: a **breeding cohort** (17 full-sib families) and a
 **natural cohort** (25 Finnish natural stands). Methylation was quantified in
@@ -22,7 +22,7 @@ This is part of the **TreeGeneClimate (TGC)** project.
 scripts/
 ├── ECS/     # Exome capture sequencing: QC → trimming → mapping →
              #   variant calling → filtering → imputation → pop. structure
-├── TBS/     # Bisulfite sequencing: QC → trimming → mapping →
+├── TMS/     # Enzymatic Methylation sequencing: QC → trimming → mapping →
              #   methylation extraction → filtering → methylation analysis
 └── JOINT/   # Joint analyses: meQTL mapping, Manhattan plots,
              #   overlap analysis, annotation, summary tables
@@ -46,7 +46,7 @@ scripts/
 | 9a | `9a.tgc.ecs.pca.R` | Principal component analysis |
 | 10a | `10a.tgc.ecs.grm.ibd.dapc.biplot.R` | GRM, IBD, DAPC figures |
 
-### TBS (DNA methylation)
+### TMS (DNA methylation)
 
 | Step | Script | Description |
 |------|--------|-------------|
@@ -64,7 +64,7 @@ scripts/
 
 | Step | Script | Description |
 |------|--------|-------------|
-| 11ab | `11ab.tgc.joint.correlation.analysis.R` | ECS–TBS correlation |
+| 11ab | `11ab.tgc.joint.correlation.analysis.R` | ECS–TMS correlation |
 | 12ab0 | `12ab0.tgc.joint.meqtl.input.prep.R` | meQTL input preparation (M-values, GRM, PCs) |
 | 12ab1 | `12ab1.tgc.joint.matrixeqtl.mapping.R` | MatrixEQTL cis-meQTL mapping (linear model) |
 | 12ab2 | `12ab2.tgc.joint.genesis.mapping.R` | GENESIS cis-meQTL mapping (LMM + GRM) |
@@ -73,7 +73,7 @@ scripts/
 | 15ab | `15ab.tgc.joint.venn.overlap.R` / `.sh` | Overlap analysis across tools and contexts |
 | 16ab | `16ab.tgc.joint.panel.assembly.R` / `.sh` | Multi-panel figure assembly |
 | 17ab | `17ab.tgc.joint.marker.annotation.R` / `.sh` | Marker annotation against reference GFF3 |
-| 18ab | `18ab.tgc.joint.summary.tables.R` | Manuscript summary tables (ECS + TBS) |
+| 18ab | `18ab.tgc.joint.summary.tables.R` | Manuscript summary tables (ECS + TMS) |
 
 ## Population correction
 
@@ -105,7 +105,7 @@ before any downstream computation.
 
 1. Set `PROJECT_ROOT` at the top of each script to your local project directory.
 2. Adapt SLURM directives (`--account`, `--partition`, `--mail-user`) for your cluster.
-3. Run scripts in the order listed above. ECS and TBS steps (1a–10a, 1b–8b) can
+3. Run scripts in the order listed above. ECS and TMS steps (1a–10a, 1b–8b) can
    be run in parallel; joint steps (11ab–18ab) require both to be complete first.
 
 ## Data availability
@@ -113,7 +113,7 @@ before any downstream computation.
 | Data type | Repository | Accession |
 |-----------|-----------|-----------|
 | Raw ECS fastq (FASTQ) | NCBI SRA | [pending] |
-| Raw TBS fastq (FASTQ) | NCBI SRA / GEO | [pending] |
+| Raw TMS fastq (FASTQ) | NCBI SRA / GEO | [pending] |
 | Methylation matrices | NCBI GEO | [pending] |
 | Filtered VCF, GDS, meQTL inputs/results | GRO.data | [pending] |
 
