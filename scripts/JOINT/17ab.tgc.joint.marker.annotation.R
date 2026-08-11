@@ -723,6 +723,24 @@ for (cohort in COHORTS) {
   }
 
   dt <- fread(rob_file, header = TRUE)
+
+  # Correct snp_pos from variant annotation (the robust_markers TSV inherited
+  # wrong positions from a metadata indexing bug in 12ab2.R, now fixed in that
+  # script). Override here so all downstream BED/VCF/bedtools steps use the
+  # correct coordinates.
+  va_path <- file.path(MQTL5_INPUTDIR, cohort, "CpG", "snp_variant_annot.tsv")
+  if (file.exists(va_path)) {
+    va <- fread(va_path, header = TRUE, select = c("snp_id", "pos"))
+    dt <- merge(dt,
+                va[, .(snp_id, snp_pos_correct = pos)],
+                by.x = "snp", by.y = "snp_id", all.x = TRUE)
+    dt[!is.na(snp_pos_correct), snp_pos := snp_pos_correct]
+    dt[, snp_pos_correct := NULL]
+    msg("  snp_pos overridden from variant annotation for ", dt[!is.na(snp_pos), .N], " rows")
+  } else {
+    msg("  WARNING: variant annotation not found — snp_pos not corrected: ", va_path)
+  }
+
   if ("snp"  %in% names(dt)) dt[, snp  := as.character(snp)]
   if ("site" %in% names(dt)) dt[, site := as.character(site)]
   msg("  ", cohort, ": ", nrow(dt), " robust pairs | ",

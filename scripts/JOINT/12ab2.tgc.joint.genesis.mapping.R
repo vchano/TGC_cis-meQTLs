@@ -438,7 +438,7 @@ for (p in seq_len(nrow(PANELS))) {
       assoc_dt <- as.data.table(assoc)
       .methyl_loc <- site[["methyl_loc"]]
       .site_pos   <- as.integer(site[["pos"]])
-      .snp_pos    <- snps_chr[["pos"]][match(assoc_dt$variant.id, cis_snps[["snp_int"]])]
+      .snp_pos    <- cis_snps[["pos"]][match(assoc_dt$variant.id, cis_snps[["snp_int"]])]
       assoc_dt[, `:=`(
         site     = .methyl_loc,
         site_chr = chr_name,
