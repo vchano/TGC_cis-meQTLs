@@ -1,10 +1,10 @@
 #!/usr/bin/env Rscript
 ############################################################
-# TreeGeneClimate (TGC) — TBS
+# TreeGeneClimate (TGC) — TMS
 # Step 8b: Heatmaps (per cohort) using cov+MEF filtered epiloci
 #
 # INPUT (same as 7b):
-#   RESULTS/TBS/RANALYSIS/METHYLKIT_OBJECTS/
+#   RESULTS/TMS/RANALYSIS/METHYLKIT_OBJECTS/
 #     methylBase_<cohort>_<context>_cov5_50_mpg*_mef0.05.rds
 #
 # METHOD:
@@ -20,15 +20,15 @@
 #       * Remaining NAs are imputed by locus mean (ONLY for heatmap/clustering)
 #
 # OUTPUT:
-#   RESULTS/TBS/RANALYSIS/FIGURES/HEATMAPS_8B/
+#   RESULTS/TMS/RANALYSIS/FIGURES/HEATMAPS_8B/
 #     Figure7a_HEATMAP_breeding_top200_KW_BH.tiff
 #     Figure7b_HEATMAP_natural_top200_KW_BH.tiff
 #
-#   RESULTS/TBS/RANALYSIS/TABLES/heatmap_markers_8B/
-#     TBS_8B_locus_tests_breeding_<ctx>.tsv
-#     TBS_8B_locus_tests_natural_<ctx>.tsv
-#     TBS_8B_selected_markers_breeding_top200.tsv
-#     TBS_8B_selected_markers_natural_top200.tsv
+#   RESULTS/TMS/RANALYSIS/TABLES/heatmap_markers_8B/
+#     TMS_8B_locus_tests_breeding_<ctx>.tsv
+#     TMS_8B_locus_tests_natural_<ctx>.tsv
+#     TMS_8B_selected_markers_breeding_top200.tsv
+#     TMS_8B_selected_markers_natural_top200.tsv
 ############################################################
 
 suppressPackageStartupMessages({
@@ -53,10 +53,10 @@ set.seed(1)   # reproducible hierarchical clustering (if ties in distance matrix
 PROJECT_ROOT <- "/path/to/your/project"  # <-- set this
 # ===========================
 
-rds_dir <- file.path(PROJECT_ROOT, "RESULTS/TBS/RANALYSIS/METHYLKIT_OBJECTS")
+rds_dir <- file.path(PROJECT_ROOT, "RESULTS/TMS/RANALYSIS/METHYLKIT_OBJECTS")
 
-fig_dir <- file.path(PROJECT_ROOT, "RESULTS/TBS/RANALYSIS/FIGURES/HEATMAPS_8B")
-tab_dir <- file.path(PROJECT_ROOT, "RESULTS/TBS/RANALYSIS/TABLES/heatmap_markers_8B")
+fig_dir <- file.path(PROJECT_ROOT, "RESULTS/TMS/RANALYSIS/FIGURES/HEATMAPS_8B")
+tab_dir <- file.path(PROJECT_ROOT, "RESULTS/TMS/RANALYSIS/TABLES/heatmap_markers_8B")
 
 dir.create(fig_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create(tab_dir, recursive = TRUE, showWarnings = FALSE)
@@ -414,11 +414,11 @@ process_cohort_for_heatmap <- function(cohort, map_path, palette_named,
 
   map <- read_map_noheader(map_path)
 
-  log_file <- file.path(tab_dir, sprintf("TBS_8B_LOG_%s.txt", tolower(cohort)))
+  log_file <- file.path(tab_dir, sprintf("TMS_8B_LOG_%s.txt", tolower(cohort)))
   log_con <- file(log_file, open = "wt")
   on.exit(close(log_con), add = TRUE)
 
-  writeLines(paste0("TBS Step 8b log — cohort: ", cohort), con = log_con)
+  writeLines(paste0("TMS Step 8b log — cohort: ", cohort), con = log_con)
   writeLines(paste0("Selection: Kruskal–Wallis per locus, BH correction within context."), con = log_con)
   writeLines(paste0("TopN for heatmap: ", top_n), con = log_con)
   writeLines("", con = log_con)
@@ -487,7 +487,7 @@ process_cohort_for_heatmap <- function(cohort, map_path, palette_named,
     writeLines("", con = log_con)
 
     # save per-context table
-    out_ctx_tsv <- file.path(tab_dir, sprintf("TBS_8B_locus_tests_%s_%s.tsv",
+    out_ctx_tsv <- file.path(tab_dir, sprintf("TMS_8B_locus_tests_%s_%s.tsv",
                                               tolower(cohort), tolower(ctx)))
     kw_df_out <- kw_df %>%
       dplyr::select(marker_id, Context, chr, start, end, loc, p, padj, H, eps2, n, k)
@@ -532,13 +532,13 @@ process_cohort_for_heatmap <- function(cohort, map_path, palette_named,
 
   # ---- Selection A: BALANCED (e.g., top150 => 50/50/50 when possible)
   selected_bal <- select_top_loci_balanced(df_all, top_n = top_n)
-  out_sel_bal_tsv <- file.path(tab_dir, sprintf("TBS_8B_selected_markers_%s_top%d_BALANCED.tsv",
+  out_sel_bal_tsv <- file.path(tab_dir, sprintf("TMS_8B_selected_markers_%s_top%d_BALANCED.tsv",
                                                 tolower(cohort), top_n))
   write.table(selected_bal, out_sel_bal_tsv, sep = "\t", quote = FALSE, row.names = FALSE)
 
   # ---- Selection B: OVERALL top_n by padj regardless of context
   selected_all <- select_top_loci_overall(df_all, top_n = top_n)
-  out_sel_all_tsv <- file.path(tab_dir, sprintf("TBS_8B_selected_markers_%s_top%d_OVERALL.tsv",
+  out_sel_all_tsv <- file.path(tab_dir, sprintf("TMS_8B_selected_markers_%s_top%d_OVERALL.tsv",
                                                 tolower(cohort), top_n))
   write.table(selected_all, out_sel_all_tsv, sep = "\t", quote = FALSE, row.names = FALSE)
 
@@ -658,7 +658,7 @@ if (nrow(sig_df) >= 2) {
 
   # Save the selected-marker table
   write.table(sig_df2,
-              file.path(tab_dir, "TBS_8B_selected_markers_natural_formal_SVMPs.tsv"),
+              file.path(tab_dir, "TMS_8B_selected_markers_natural_formal_SVMPs.tsv"),
               sep = "\t", quote = FALSE, row.names = FALSE)
 
   # ---- Figure 7b: natural formal SVMPs standalone

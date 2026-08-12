@@ -1,14 +1,14 @@
-# JOINT — Integrated ECS + TBS Analyses
+# JOINT — Integrated ECS + TMS Analyses
 
-Joint analyses combining SNP genotype (ECS) and DNA methylation (TBS) data for
-cis-meQTL mapping in *Picea abies*. Requires ECS steps 1a–10a and TBS steps
+Joint analyses combining SNP genotype (ECS) and DNA methylation (TMS) data for
+cis-meQTL mapping in *Picea abies*. Requires ECS steps 1a–10a and TMS steps
 1b–8b to be complete before running.
 
 ## Steps
 
 | Step | Script(s) | Input | Output | Tool |
 |------|-----------|-------|--------|------|
-| 11ab | `11ab.tgc.joint.correlation.analysis.R` | ECS PCs, TBS PCs | Procrustes / correlation figures | vegan, ggplot2 |
+| 11ab | `11ab.tgc.joint.correlation.analysis.R` | ECS PCs, TMS PCs | Procrustes / correlation figures | vegan, ggplot2 |
 | 12ab0 | `12ab0.tgc.joint.meqtl.input.prep.R` | GDS, GRM, methylKit objects | M-value matrices, SNP annotation, PCs, GRM (RDS + TSV) | data.table, SeqArray |
 | 12ab1 | `12ab1.tgc.joint.matrixeqtl.mapping.R` | outputs of 12ab0 | cis-meQTL results per panel (RDS) | MatrixEQTL |
 | 12ab2 | `12ab2.tgc.joint.genesis.mapping.R` | outputs of 12ab0 | cis-meQTL results per panel (RDS) | GENESIS |

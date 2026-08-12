@@ -1,6 +1,6 @@
 #!/bin/bash
 #-------------------------------------------------------------------------------
-# TreeGeneClimate (TGC) — JOINT ECS + TBS
+# TreeGeneClimate (TGC) — JOINT ECS + TMS
 # Step 15ab: meQTL overlap analysis — Venn diagrams + panel assembly
 #
 # Reads significant meQTL results (p_FDR < 1e-10) from 13ab.R and produces:

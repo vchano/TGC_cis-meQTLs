@@ -1,15 +1,15 @@
 #!/bin/bash
 #-------------------------------------------------------------------------------
-# TreeGeneClimate (TGC) — TBS
+# TreeGeneClimate (TGC) — TMS
 # Step 4b2: Coverage filtering of Bismark coverage files
 #   Keep sites with 5 <= coverage <= 50
 #   Separate outputs by cohort (BREEDING vs NATURAL)
 #
 # Input:
-#   RESULTS/TBS/METHYLATION_CALLS/<SAMPLE>/*.bismark.cov.gz
+#   RESULTS/TMS/METHYLATION_CALLS/<SAMPLE>/*.bismark.cov.gz
 #
 # Output:
-#   RESULTS/TBS/METHYLATION_FILTERED/<COHORT>/<SAMPLE>.bismark.min5.max50.cov.gz
+#   RESULTS/TMS/METHYLATION_FILTERED/<COHORT>/<SAMPLE>.bismark.min5.max50.cov.gz
 #-------------------------------------------------------------------------------
 
 #SBATCH -p YOUR_PARTITION
@@ -17,7 +17,7 @@
 #SBATCH -N 1
 #SBATCH -c 8
 #SBATCH --mem=16G
-#SBATCH --job-name=TBS.COVFILTER
+#SBATCH --job-name=TMS.COVFILTER
 #SBATCH --output=/path/to/your/project/LOGS/%x_%j.out
 #SBATCH --error=/path/to/your/project/LOGS/%x_%j.err
 #SBATCH --mail-type=BEGIN,END
@@ -28,8 +28,8 @@ set -euo pipefail
 # === USER CONFIGURATION ===
 PROJECT_ROOT="/path/to/your/project"  # <-- set this
 # ===========================
-INPUT="${PROJECT_ROOT}/RESULTS/TBS/METHYLATION_CALLS"
-OUTBASE="${PROJECT_ROOT}/RESULTS/TBS/METHYLATION_FILTERED"
+INPUT="${PROJECT_ROOT}/RESULTS/TMS/METHYLATION_CALLS"
+OUTBASE="${PROJECT_ROOT}/RESULTS/TMS/METHYLATION_FILTERED"
 
 MINCOV=5
 MAXCOV=50

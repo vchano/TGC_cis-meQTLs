@@ -1,6 +1,6 @@
 #!/bin/bash
 ############################################################
-# TreeGeneClimate (TGC) — JOINT ECS + TBS
+# TreeGeneClimate (TGC) — JOINT ECS + TMS
 # Step 16ab8: cis-meQTL validation — SLURM wrappers
 #
 # Three stages, each submitted as a separate SLURM job.

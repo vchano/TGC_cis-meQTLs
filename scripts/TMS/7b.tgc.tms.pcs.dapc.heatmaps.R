@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 ############################################################
-# TreeGeneClimate (TGC) — TBS
+# TreeGeneClimate (TGC) — TMS
 # Step 7b (UPDATED): PCA panel (supp) + DAPC panel (Figure 5) + DAPC loadings TSVs
 #
 # CHANGES (requested):
@@ -14,16 +14,16 @@
 # - Fix loadings tables: output loc/chr/pos (pos=start) + DF + loading.
 #
 # INPUT:
-#   RESULTS/TBS/RANALYSIS/METHYLKIT_OBJECTS/
+#   RESULTS/TMS/RANALYSIS/METHYLKIT_OBJECTS/
 #     methylBase_<cohort>_<context>_cov5_50_mpg*_mef0.05.rds
 #
 # OUTPUT:
-#   RESULTS/TBS/RANALYSIS/FIGURES/FIG5_FIG6/
+#   RESULTS/TMS/RANALYSIS/FIGURES/FIG5_FIG6/
 #     SUPP_PCA_panel_a-f.tiff
 #     Figure5_DAPC_panel_a-f.tiff
 #
-#   RESULTS/TBS/RANALYSIS/TABLES/dapc_loadings/
-#     TBS_DAPC_loadings_<cohort>_<context>_ALL.tsv
+#   RESULTS/TMS/RANALYSIS/TABLES/dapc_loadings/
+#     TMS_DAPC_loadings_<cohort>_<context>_ALL.tsv
 ############################################################
 
 suppressPackageStartupMessages({
@@ -48,9 +48,9 @@ set.seed(1)   # ensures reproducible DAPC (which uses random SVD internally)
 # === USER CONFIGURATION ===
 PROJECT_ROOT <- "/path/to/your/project"  # <-- set this
 # ===========================
-rds_dir <- file.path(PROJECT_ROOT, "RESULTS/TBS/RANALYSIS/METHYLKIT_OBJECTS")
-fig_dir <- file.path(PROJECT_ROOT, "RESULTS/TBS/RANALYSIS/FIGURES/FIG5_FIG6")
-tab_dir <- file.path(PROJECT_ROOT, "RESULTS/TBS/RANALYSIS/TABLES/dapc_loadings")
+rds_dir <- file.path(PROJECT_ROOT, "RESULTS/TMS/RANALYSIS/METHYLKIT_OBJECTS")
+fig_dir <- file.path(PROJECT_ROOT, "RESULTS/TMS/RANALYSIS/FIGURES/FIG5_FIG6")
+tab_dir <- file.path(PROJECT_ROOT, "RESULTS/TMS/RANALYSIS/TABLES/dapc_loadings")
 
 dir.create(fig_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create(tab_dir, recursive = TRUE, showWarnings = FALSE)
@@ -412,7 +412,7 @@ analyze_one <- function(cohort, ctx, map_path, palette_named) {
     left_join(site_df_used %>% dplyr::select(loc, chr, pos), by = "loc") %>%
     dplyr::relocate(chr, pos, DF, loading, .after = loc)
 
-  out_tsv <- file.path(tab_dir, sprintf("TBS_DAPC_loadings_%s_%s_ALL.tsv",
+  out_tsv <- file.path(tab_dir, sprintf("TMS_DAPC_loadings_%s_%s_ALL.tsv",
                                         tolower(cohort), tolower(ctx)))
   write.table(load_all, out_tsv, sep = "\t", quote = FALSE, row.names = FALSE)
 

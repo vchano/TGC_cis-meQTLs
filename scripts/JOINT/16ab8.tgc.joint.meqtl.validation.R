@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 ############################################################
-# TreeGeneClimate (TGC) — JOINT ECS + TBS
+# TreeGeneClimate (TGC) — JOINT ECS + TMS
 # Step 16ab8: cis-meQTL validation analyses
 #
 # Three complementary analyses to validate and contextualise

@@ -1,6 +1,6 @@
 #!/bin/bash
 #-------------------------------------------------------------------------------
-# TreeGeneClimate (TGC) — JOINT ECS + TBS
+# TreeGeneClimate (TGC) — JOINT ECS + TMS
 # Step 16ab: Orchestrator — meQTL5 full pipeline (SLURM job array)
 #
 # Pipeline order (all within this single script):

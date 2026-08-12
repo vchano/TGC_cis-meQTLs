@@ -1,14 +1,14 @@
 #!/usr/bin/env Rscript
 ############################################################
-# TreeGeneClimate (TGC) — JOINT ECS + TBS
+# TreeGeneClimate (TGC) — JOINT ECS + TMS
 # Step 20ab: Compile summary tables for manuscript
 #
 # OUTPUTS (RESULTS/JOINT/COMBINED5/tables/)
 #   table_ecs_summary.tsv / .md   — ECS genotyping table
-#   table_tbs_summary.tsv / .md   — TBS methylation table (replaces Table 1 + 1b)
+#   table_tms_summary.tsv / .md   — TMS methylation table (replaces Table 1 + 1b)
 #
 # Manuscript draft:
-#   Table 1 + Table 1b blocks replaced with new unified TBS table
+#   Table 1 + Table 1b blocks replaced with new unified TMS table
 #   ECS table inserted as Table S-ECS before Table 1
 ############################################################
 
@@ -38,12 +38,12 @@ BIM_B      <- file.path(PROJECT_ROOT, "RESULTS", "ECS", "POPGEN", "STRUCTURE",
 BIM_N      <- file.path(PROJECT_ROOT, "RESULTS", "ECS", "POPGEN", "STRUCTURE",
                         "NATURAL",  "tgc.ecs.natural.admix.pruned.bim")
 
-# methylKit summary CSVs from the TBS input-prep step
-TBS_MK_DIR <- file.path(PROJECT_ROOT, "RESULTS", "TBS", "RANALYSIS", "METHYLKIT_OBJECTS")
+# methylKit summary CSVs from the TMS input-prep step
+TMS_MK_DIR <- file.path(PROJECT_ROOT, "RESULTS", "TMS", "RANALYSIS", "METHYLKIT_OBJECTS")
 # ANOVA log from step 6b (methylation level comparisons between populations)
-ANOVA_DIR  <- file.path(PROJECT_ROOT, "RESULTS", "TBS", "RANALYSIS", "ANOVA.METHYL.LEVEL")
+ANOVA_DIR  <- file.path(PROJECT_ROOT, "RESULTS", "TMS", "RANALYSIS", "ANOVA.METHYL.LEVEL")
 # Kruskal-Wallis SVMP result files from step 8b
-KW_DIR     <- file.path(PROJECT_ROOT, "RESULTS", "TBS", "RANALYSIS", "TABLES", "heatmap_markers_8B")
+KW_DIR     <- file.path(PROJECT_ROOT, "RESULTS", "TMS", "RANALYSIS", "TABLES", "heatmap_markers_8B")
 # Robust cis-meQTL summary produced by 15ab.R
 ROBUST_TSV <- file.path(COMBINED5, "overlap", "tables", "robust_context_summary.tsv")
 
@@ -148,15 +148,15 @@ write.table(ecs_tbl, file.path(OUT_DIR, "table_ecs_summary.tsv"),
 msg("  Saved: table_ecs_summary.tsv")
 
 ############################################################
-# 3) TBS TABLE
+# 3) TMS TABLE
 ############################################################
 
-msg("=== TBS table ===")
+msg("=== TMS table ===")
 
 ## 3a) methylKit summary CSVs
 # Files named: summary_<cohort>_cov5_50_mpg*_mef0.05.csv — one per cohort × context
-mk_files <- Sys.glob(file.path(TBS_MK_DIR, "summary_*_cov5_50_mpg*_mef0.05.csv"))
-if (length(mk_files) == 0) stop("No methylKit summary CSVs found in: ", TBS_MK_DIR)
+mk_files <- Sys.glob(file.path(TMS_MK_DIR, "summary_*_cov5_50_mpg*_mef0.05.csv"))
+if (length(mk_files) == 0) stop("No methylKit summary CSVs found in: ", TMS_MK_DIR)
 mk <- do.call(rbind, lapply(mk_files, read.csv))
 # Normalise context to canonical case (CpG, CHG, CHH)
 ctx_norm   <- function(x) ifelse(tolower(x) == "cpg", "CpG", toupper(x))
@@ -226,7 +226,7 @@ count_tukey <- function(tsv) {
 ## 3d) Count significant KW markers (q < 0.05)
 count_svmps <- function(cohort, context) {
   path <- file.path(KW_DIR,
-    sprintf("TBS_8B_locus_tests_%s_%s.tsv", tolower(cohort), tolower(context)))
+    sprintf("TMS_8B_locus_tests_%s_%s.tsv", tolower(cohort), tolower(context)))
   if (!file.exists(path)) { msg("  MISSING KW: ", basename(path)); return(NA_integer_) }
   d <- read.table(path, sep = "\t", header = TRUE)
   # Count loci whose BH-adjusted KW p-value is below the significance threshold
@@ -245,7 +245,7 @@ CONTEXTS <- c("CpG", "CHG", "CHH")
 COMBOS   <- expand.grid(cohort = COHORTS, context = CONTEXTS,
                         stringsAsFactors = FALSE)[, c("cohort", "context")]
 
-tbs_rows <- lapply(seq_len(nrow(COMBOS)), function(i) {
+tms_rows <- lapply(seq_len(nrow(COMBOS)), function(i) {
   coh <- COMBOS$cohort[i]
   ctx <- COMBOS$context[i]
   key <- paste0(coh, "_", ctx)
@@ -279,11 +279,11 @@ tbs_rows <- lapply(seq_len(nrow(COMBOS)), function(i) {
   )
 })
 
-tbs_tbl <- do.call(rbind, tbs_rows)
+tms_tbl <- do.call(rbind, tms_rows)
 
-write.table(tbs_tbl, file.path(OUT_DIR, "table_tbs_summary.tsv"),
+write.table(tms_tbl, file.path(OUT_DIR, "table_tms_summary.tsv"),
             sep = "\t", row.names = FALSE, quote = FALSE)
-msg("  Saved: table_tbs_summary.tsv")
+msg("  Saved: table_tms_summary.tsv")
 
 ############################################################
 # 4) FORMAT MARKDOWN TABLES
@@ -306,20 +306,20 @@ ecs_md_lines <- c(
 )
 ecs_md <- paste(ecs_md_lines, collapse = "\n")
 
-## TBS unified Table 1
-tbs_header <- paste0(
+## TMS unified Table 1
+tms_header <- paste0(
   "| Cohort | Context | N | Raw sites^a^ | Cov. sites^b^ |",
   " After unite^c^ | MEF sites^d^ |",
   " SW p | Levene p | ANOVA p | Sig. pairs^e^ | SVMPs^f^ | Robust sites^g^ |"
 )
-tbs_sep <- paste0(
+tms_sep <- paste0(
   "|--------|---------|--:|-------------:|--------------:|",
   "---------------:|-------------:|",
   "------:|----------:|--------:|:-------------|--------:|-----------------:|"
 )
 
 # Construct one markdown row per cohort × context combination
-tbs_body <- apply(tbs_tbl, 1L, function(r) {
+tms_body <- apply(tms_tbl, 1L, function(r) {
   paste0(
     "| ", r["Cohort"],
     " | ", r["Context"],
@@ -339,7 +339,7 @@ tbs_body <- apply(tbs_tbl, 1L, function(r) {
 })
 
 # Footnotes explain abbreviations and filtering criteria used for each column
-tbs_footnotes <- paste(
+tms_footnotes <- paste(
   "^a^ Median cytosine sites per sample before coverage filtering.",
   "^b^ Median sites per sample after 5–50× coverage filter.",
   "^c^ Sites present in at least min.per.group samples (after `unite()`).",
@@ -350,21 +350,21 @@ tbs_footnotes <- paste(
   sep = "  \n"
 )
 
-tbs_md_lines <- c(
-  "**Table 1. Targeted bisulfite sequencing (TBS) data summary by cohort and cytosine context.**",
+tms_md_lines <- c(
+  "**Table 1. Targeted Enzymatic Methylation Sequencing (TMS) data summary by cohort and cytosine context.**",
   "",
-  tbs_header,
-  tbs_sep,
-  tbs_body,
+  tms_header,
+  tms_sep,
+  tms_body,
   "",
-  tbs_footnotes,
+  tms_footnotes,
   ""
 )
-tbs_md <- paste(tbs_md_lines, collapse = "\n")
+tms_md <- paste(tms_md_lines, collapse = "\n")
 
 writeLines(ecs_md, file.path(OUT_DIR, "table_ecs_summary.md"))
-writeLines(tbs_md, file.path(OUT_DIR, "table_tbs_summary.md"))
-msg("  Saved: table_ecs_summary.md, table_tbs_summary.md")
+writeLines(tms_md, file.path(OUT_DIR, "table_tms_summary.md"))
+msg("  Saved: table_ecs_summary.md, table_tms_summary.md")
 
 ############################################################
 # 5) UPDATE MANUSCRIPT DRAFT
@@ -384,7 +384,7 @@ if (!file.exists(DRAFT_MD)) {
 
   if (is.na(t1_start)) {
     msg("  WARNING: Could not find '**Table 1' in draft — appending")
-    writeLines(c(draft, "", tbs_md_lines), DRAFT_MD)
+    writeLines(c(draft, "", tms_md_lines), DRAFT_MD)
   } else {
     # End of the block = last "|"-prefixed line at or after the last sub-table start
     block_end_search_from <- if (!is.na(t1b_start)) t1b_start else t1_start
@@ -396,11 +396,11 @@ if (!file.exists(DRAFT_MD)) {
 
     new_draft <- c(
       draft[seq_len(t1_start - 1L)],
-      tbs_md_lines,
+      tms_md_lines,
       draft[seq(t1_end + 1L, length(draft))]
     )
     writeLines(new_draft, DRAFT_MD)
-    msg("  Table 1 + Table 1b replaced with unified TBS table")
+    msg("  Table 1 + Table 1b replaced with unified TMS table")
 
     # Insert ECS table just before "**Table 1."
     draft2   <- readLines(DRAFT_MD)

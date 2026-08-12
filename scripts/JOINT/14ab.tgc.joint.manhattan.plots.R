@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 ############################################################
-# TreeGeneClimate (TGC) — JOINT ECS + TBS
+# TreeGeneClimate (TGC) — JOINT ECS + TMS
 # Step 14ab: Circular Manhattan plots (GENESIS5 + MatrixEQTL5)
 #
 # PURPOSE

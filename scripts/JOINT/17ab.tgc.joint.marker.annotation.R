@@ -1,12 +1,12 @@
 #!/usr/bin/env Rscript
 ############################################################
-# TreeGeneClimate (TGC) — JOINT ECS + TBS
+# TreeGeneClimate (TGC) — JOINT ECS + TMS
 # Step 17ab: Marker annotation against reference genome GFF3
 #
 # Annotates:
 #   - ECS DAPC top-10 SNPs (per cohort x DF)
-#   - TBS DAPC top-10 methylation sites (per cohort x context x DF)
-#   - TBS KW SVMPs: breeding top-150 balanced + natural 6 formal SVMPs (step 8b)
+#   - TMS DAPC top-10 methylation sites (per cohort x context x DF)
+#   - TMS KW SVMPs: breeding top-150 balanced + natural 6 formal SVMPs (step 8b)
 #   - meQTL ROBUST markers: SNP + site positions significant at
 #     p_FDR < 1e-10 in BOTH GENESIS5 AND MatrixEQTL5
 #     (reads robust_markers_<cohort>.tsv from 15ab.R)
@@ -59,15 +59,15 @@ VCF_FILES <- list(
 )
 
 DAPC_ECS_ROOT <- file.path(PROJECT_ROOT, "RESULTS/ECS/RANALYSIS/TABLES/dapc_loadings")
-DAPC_TBS_ROOT <- file.path(PROJECT_ROOT, "RESULTS/TBS/RANALYSIS/TABLES/dapc_loadings")
+DAPC_TMS_ROOT <- file.path(PROJECT_ROOT, "RESULTS/TMS/RANALYSIS/TABLES/dapc_loadings")
 # Robust marker tables produced by 15ab.R
 ROBUST_ROOT   <- file.path(PROJECT_ROOT, "RESULTS/JOINT/COMBINED5/overlap/tables")
-SVMP_ROOT     <- file.path(PROJECT_ROOT, "RESULTS/TBS/RANALYSIS/TABLES/heatmap_markers_8B")
+SVMP_ROOT     <- file.path(PROJECT_ROOT, "RESULTS/TMS/RANALYSIS/TABLES/heatmap_markers_8B")
 
 # Directory with mean methylation beta files (one per cohort × context).
 # Expected filename: mean_beta_<cohort>_<context>.tsv  (columns: site, mean_beta)
 # Computed automatically from M-value matrices in MQTL5_INPUTDIR if not present.
-BETA_ROOT <- file.path(PROJECT_ROOT, "RESULTS/TBS/METHYLATION/mean_betas")
+BETA_ROOT <- file.path(PROJECT_ROOT, "RESULTS/TMS/METHYLATION/mean_betas")
 
 # M-value matrix inputs from 12ab0.R — used to compute mean betas on the fly.
 # Path: MQTL5_INPUTDIR/<COHORT>/<CONTEXT>/methylation_mvalues_matrix.rds
@@ -551,17 +551,17 @@ if (nrow(ecs_top) > 0) {
 }
 
 ############################################################
-# 6) TBS DAPC — TOP-10 SITES PER COHORT x CONTEXT x DF
+# 6) TMS DAPC — TOP-10 SITES PER COHORT x CONTEXT x DF
 ############################################################
 
 msg("======================================================")
-msg("TBS DAPC — top-10 methylation sites per cohort x context x DF")
+msg("TMS DAPC — top-10 methylation sites per cohort x context x DF")
 
-tbs_list <- list()
+tms_list <- list()
 for (cohort in COHORTS) {
   for (ctx in CONTEXTS) {
-    f <- file.path(DAPC_TBS_ROOT,
-                   sprintf("TBS_DAPC_loadings_%s_%s_ALL.tsv",
+    f <- file.path(DAPC_TMS_ROOT,
+                   sprintf("TMS_DAPC_loadings_%s_%s_ALL.tsv",
                            tolower(cohort), tolower(ctx)))
     if (!file.exists(f)) { msg("  Missing: ", f); next }
     dt <- fread(f, header = TRUE)
@@ -572,63 +572,63 @@ for (cohort in COHORTS) {
     dt[, context := ctx]
     top <- dt[order(-abs_loading), .SD[seq_len(min(TOP_N, .N))], by = DF]
     top[, abs_loading := NULL]
-    tbs_list[[paste(cohort, ctx)]] <- top
+    tms_list[[paste(cohort, ctx)]] <- top
   }
 }
 
-tbs_top <- rbindlist(tbs_list, fill = TRUE)
+tms_top <- rbindlist(tms_list, fill = TRUE)
 
-if (nrow(tbs_top) > 0) {
+if (nrow(tms_top) > 0) {
   # GFF3 annotation via bedtools
-  bed_path <- file.path(TMP_DIR, "tbs_dapc.bed")
-  write_marker_bed(tbs_top, "chr", "pos", "loc", bed_path)
+  bed_path <- file.path(TMP_DIR, "tms_dapc.bed")
+  write_marker_bed(tms_top, "chr", "pos", "loc", bed_path)
   ann <- run_bedtools_closest(bed_path, genes_bed_path)
 
   if (nrow(ann) > 0) {
     setnames(ann, "marker_id", "loc")
-    tbs_top <- merge(tbs_top,
+    tms_top <- merge(tms_top,
                      ann[, .(loc, gene_id, gene_chr, gene_start,
                               gene_end, gene_strand, distance_bp)],
                      by = "loc", all.x = TRUE)
   }
 
   # Methylation sites are not in the VCF — set SNP-specific columns to NA
-  tbs_top[, c("ref","alt","af","dr2") := list(NA_character_, NA_character_,
+  tms_top[, c("ref","alt","af","dr2") := list(NA_character_, NA_character_,
                                                NA_real_, NA_real_)]
-  tbs_top <- add_annotation_class(tbs_top)
-  tbs_top[, source      := "TBS_DAPC"]
-  tbs_top[, marker_type := "methylation_site"]
+  tms_top <- add_annotation_class(tms_top)
+  tms_top[, source      := "TMS_DAPC"]
+  tms_top[, marker_type := "methylation_site"]
 
   # Option 1 — absolute methylation status (via loading sign + optional beta files)
   # methylation_direction: sign of DAPC loading (positive/negative relative to DF axis)
-  tbs_top[, methylation_direction := ifelse(loading > 0, "positive", "negative")]
-  tbs_top <- add_meth_status(tbs_top, site_col = "loc")
+  tms_top[, methylation_direction := ifelse(loading > 0, "positive", "negative")]
+  tms_top <- add_meth_status(tms_top, site_col = "loc")
   # Cross-cohort comparison not applicable for DAPC (per-cohort analysis)
-  tbs_top[, higher_methylation_cohort := NA_character_]
+  tms_top[, higher_methylation_cohort := NA_character_]
 
-  setnames(tbs_top, "loc", "marker_id")
+  setnames(tms_top, "loc", "marker_id")
 
-  tbs_top <- add_functional_annotation(tbs_top, func_annot, te_genes)
-  fwrite(tbs_top, file.path(OUT_ROOT, "tbs_dapc_top20_annotated.tsv"), sep = "\t")
-  msg("  Saved: tbs_dapc_top20_annotated.tsv (", nrow(tbs_top), " markers)")
+  tms_top <- add_functional_annotation(tms_top, func_annot, te_genes)
+  fwrite(tms_top, file.path(OUT_ROOT, "tms_dapc_top20_annotated.tsv"), sep = "\t")
+  msg("  Saved: tms_dapc_top20_annotated.tsv (", nrow(tms_top), " markers)")
 } else {
-  msg("  No TBS DAPC markers found.")
-  tbs_top <- data.table()
+  msg("  No TMS DAPC markers found.")
+  tms_top <- data.table()
 }
 
 ############################################################
-# 6b) TBS KW SVMPs — SELECTED MARKERS FROM STEP 8b
+# 6b) TMS KW SVMPs — SELECTED MARKERS FROM STEP 8b
 #
 # Breeding: top-150 balanced (50 per context, all formal SVMPs)
 # Natural:  6 formal SVMPs only (3 CpG + 3 CHH; padj < 0.05)
 ############################################################
 
 msg("======================================================")
-msg("TBS KW SVMPs — annotating selected markers from step 8b")
+msg("TMS KW SVMPs — annotating selected markers from step 8b")
 
 svmp_files <- list(
-  BREEDING = file.path(SVMP_ROOT, "TBS_8B_selected_markers_breeding_top150_BALANCED.tsv"),
-  NATURAL  = file.path(SVMP_ROOT, "TBS_8B_selected_markers_natural_formal_SVMPs.tsv")
+  BREEDING = file.path(SVMP_ROOT, "TMS_8B_selected_markers_breeding_top150_BALANCED.tsv"),
+  NATURAL  = file.path(SVMP_ROOT, "TMS_8B_selected_markers_natural_formal_SVMPs.tsv")
 )
 
 svmp_all_list <- list()
@@ -650,7 +650,7 @@ for (cohort in COHORTS) {
 
   # BEDTools annotation
   bed_path <- file.path(TMP_DIR,
-    sprintf("tbs_svmp_%s.bed", tolower(cohort)))
+    sprintf("tms_svmp_%s.bed", tolower(cohort)))
   write_marker_bed(dt, "chr", "pos", "marker_id", bed_path)
   ann <- run_bedtools_closest(bed_path, genes_bed_path)
 
@@ -667,7 +667,7 @@ for (cohort in COHORTS) {
   dt <- add_meth_status(dt, site_col = "loc")
 
   # Standard marker metadata columns; SNP-specific fields are NA for methylation sites
-  dt[, source                    := "TBS_KW_SVMP"]
+  dt[, source                    := "TMS_KW_SVMP"]
   dt[, marker_type               := "methylation_site"]
   dt[, tool                      := NA_character_]
   dt[, DF                        := NA_character_]
@@ -686,7 +686,7 @@ for (cohort in COHORTS) {
   dt <- add_functional_annotation(dt, func_annot, te_genes)
 
   out_f <- file.path(OUT_ROOT,
-    sprintf("tbs_svmp_%s_annotated.tsv", tolower(cohort)))
+    sprintf("tms_svmp_%s_annotated.tsv", tolower(cohort)))
   fwrite(dt, out_f, sep = "\t")
   msg("  Saved: ", basename(out_f), " (", nrow(dt), " markers)")
   cat("  Annotation class breakdown:\n")
@@ -1016,8 +1016,8 @@ if (nrow(ecs_top) > 0)
   all_list[["ECS_DAPC"]] <- prep_for_combine(
     ecs_top[, tool := NA_character_][, loading := loading])
 
-if (nrow(tbs_top) > 0)
-  all_list[["TBS_DAPC"]] <- prep_for_combine(tbs_top[, tool := NA_character_])
+if (nrow(tms_top) > 0)
+  all_list[["TMS_DAPC"]] <- prep_for_combine(tms_top[, tool := NA_character_])
 
 for (key in names(meqtl_results))
   all_list[[key]] <- prep_for_combine(meqtl_results[[key]])

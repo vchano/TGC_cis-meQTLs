@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 ############################################################
-# TreeGeneClimate (TGC) — JOINT ECS + TBS
+# TreeGeneClimate (TGC) — JOINT ECS + TMS
 # Step 16ab7: Per-site methylation heritability
 #
 # Estimates SNP-based heritability (h²_SNP) at every

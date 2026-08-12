@@ -1,35 +1,30 @@
 #!/bin/bash
 #-------------------------------------------------------------------------------
-# TreeGeneClimate (TGC) — TBS
-# Step 2b: TRIMMOMATIC (paired-end) + FASTQC + MULTIQC on TRIMMED FASTQ (TBS)
+# TreeGeneClimate (TGC) — TMS
+# Step 3b: BISMARK mapping on TRIMMED FASTQ (TMS), plates P001–P008
 #
 # Project root:
 #   /path/to/your/project
 #
 # Input (data, frozen):
-#   DATA/TBS/RAWDATA.TBS/HEL_101202_*_R1.fastq.gz
-#   DATA/TBS/RAWDATA.TBS/HEL_101202_*_R2.fastq.gz
+#   DATA/TMS/TRIMMED.FASTQ.TMS/*_R1_p.fastq.gz
+#   DATA/TMS/TRIMMED.FASTQ.TMS/*_R2_p.fastq.gz
+#
+# Reference (frozen):
+#   REFERENCE/Picab02_genome.assembly/bismark/
 #
 # Output (data, frozen):
-#   DATA/TBS/TRIMMED.FASTQ.TBS/           (paired reads)
-#   DATA/TBS/TRIMMED.FASTQ.TBS/UNPAIRED/  (unpaired reads)
-#
-# Output (results):
-#   RESULTS/TBS/QC/TRIMMED/FASTQC/
-#   RESULTS/TBS/QC/TRIMMED/MULTIQC/
-#
-# Adapters:
-#   DATA/METADATA/adapters.fa
+#   DATA/TMS/MAPPED.FILES.TMS/<PLATE>/
 #-------------------------------------------------------------------------------
 
 #SBATCH --account=YOUR_ACCOUNT
 #SBATCH --partition=YOUR_PARTITION
-#SBATCH -n 48
+#SBATCH -n 96
 #SBATCH -N 1
-#SBATCH --job-name=TBS.TRIM
+#SBATCH --job-name=TMS.BISMARK
 #SBATCH --output=/path/to/your/project/LOGS/%x_%j.out
 #SBATCH --error=/path/to/your/project/LOGS/%x_%j.err
-#SBATCH --ntasks-per-socket 24
+#SBATCH --exclusive
 #SBATCH --time=48:00:00
 #SBATCH --mail-type=BEGIN,END
 #SBATCH --mail-user=YOUR_EMAIL
@@ -39,31 +34,22 @@ set -euo pipefail
 echo "[$(date)] SLURM job started: ${SLURM_JOB_NAME:-no_slurm}"
 
 module purge
-module load fastqc/0.11.4
-module load anaconda3/2020.11
-module load trimmomatic/0.36
+module load miniforge3/24.3.0-0
+module load gcc/14.2.0
+module load bowtie2/2.5.4
+module load samtools/1.21
+source activate bismark
 
 # === USER CONFIGURATION ===
 PROJECT_ROOT="/path/to/your/project"  # <-- set this
 # ===========================
 
-INPUT="${PROJECT_ROOT}/DATA/TBS/RAWDATA.TBS"
-TRIMMED="${PROJECT_ROOT}/DATA/TBS/TRIMMED.FASTQ.TBS"
-UNPAIRED="${TRIMMED}/UNPAIRED"
+INPUT="${PROJECT_ROOT}/DATA/TMS/TRIMMED.FASTQ.TMS"
+OUTBASE="${PROJECT_ROOT}/DATA/TMS/MAPPED.FILES.TMS"
+REF="${PROJECT_ROOT}/REFERENCE/Picab02_genome.assembly/bismark"
 
-QC_BASE="${PROJECT_ROOT}/RESULTS/TBS/QC/TRIMMED"
-QC_FASTQC="${QC_BASE}/FASTQC"
-QC_MULTIQC="${QC_BASE}/MULTIQC"
-
-ADAPTERS="${PROJECT_ROOT}/DATA/METADATA/adapters.fa"
 LOGS="${PROJECT_ROOT}/LOGS"
-
-mkdir -p "${TRIMMED}" "${UNPAIRED}" "${QC_FASTQC}" "${QC_MULTIQC}" "${LOGS}"
-
-if [[ ! -s "${ADAPTERS}" ]]; then
-  echo "ERROR: adapters file not found or empty: ${ADAPTERS}"
-  exit 1
-fi
+mkdir -p "${OUTBASE}" "${LOGS}"
 
 list='
 P001_WA01 P001_WA02 P001_WA03 P001_WA04 P001_WA05 P001_WA06 P001_WA07 P001_WA08 P001_WA09 P001_WA10 P001_WA11 P001_WA12
@@ -129,35 +115,26 @@ P008_WB01 P008_WB02 P008_WB03 P008_WB04 P008_WB05 P008_WB06
 '
 
 for sample in ${list}; do
-  r1="${INPUT}/HEL_101202_${sample}_R1.fastq.gz"
-  r2="${INPUT}/HEL_101202_${sample}_R2.fastq.gz"
+  plate="${sample%%_*}"
+  outdir="${OUTBASE}/${plate}"
+
+  r1="${INPUT}/${sample}_R1_p.fastq.gz"
+  r2="${INPUT}/${sample}_R2_p.fastq.gz"
 
   if [[ ! -s "${r1}" || ! -s "${r2}" ]]; then
     echo "WARNING: missing pair for ${sample}; skipping"
     continue
   fi
 
-  java -jar /usr/product/bioinfo/SL_7.0/BIOINFORMATICS/TRIMMOMATIC/0.36/trimmomatic-0.36.jar PE \
-    -threads 48 -phred33 \
-    "${r1}" "${r2}" \
-    "${TRIMMED}/${sample}_R1_p.fastq.gz" "${UNPAIRED}/${sample}_R1_u.fastq.gz" \
-    "${TRIMMED}/${sample}_R2_p.fastq.gz" "${UNPAIRED}/${sample}_R2_u.fastq.gz" \
-    ILLUMINACLIP:"${ADAPTERS}":2:30:10 \
-    CROP:138 HEADCROP:12 SLIDINGWINDOW:5:20 MINLEN:30
+  mkdir -p "${outdir}"
+
+  bismark -q -L 15 -N 1 --score_min L,-1,-1 \
+    --parallel 4 --un --ambiguous \
+    -o "${outdir}" \
+    --genome "${REF}" \
+    -1 "${r1}" -2 "${r2}"
 done
 
-shopt -s nullglob
-trim_fastq=( "${TRIMMED}"/*_p.fastq.gz )
-if (( ${#trim_fastq[@]} == 0 )); then
-  echo "ERROR: no trimmed paired FASTQ produced in: ${TRIMMED}"
-  exit 1
-fi
-
-fastqc "${trim_fastq[@]}" --outdir "${QC_FASTQC}" --threads 48
-
-source activate multiqc
-multiqc "${QC_FASTQC}" -o "${QC_MULTIQC}"
 conda deactivate
-
 echo "[$(date)] Done."
 exit 0

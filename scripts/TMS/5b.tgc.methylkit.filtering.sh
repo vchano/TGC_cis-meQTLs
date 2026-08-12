@@ -1,6 +1,6 @@
 #!/bin/bash
 #-------------------------------------------------------------------------------
-# TreeGeneClimate (TGC) — TBS
+# TreeGeneClimate (TGC) — TMS
 # Step 5b: methylKit import from sorted Bismark BAMs (by cohort + context)
 #   - Ensure BAM indexes exist (CSI/BAI)
 #   - Import methylation calls from BAMs (processBismarkAln)
@@ -13,10 +13,10 @@
 #   - Write summary CSV with site counts at each stage
 #
 # INPUT:
-#   DATA/TBS/MAPPED.FILES.TBS/*_R1_p_bismark_bt2_pe.sorted.bam
+#   DATA/TMS/MAPPED.FILES.TMS/*_R1_p_bismark_bt2_pe.sorted.bam
 #
 # OUTPUT:
-#   RESULTS/TBS/RANALYSIS/METHYLKIT_OBJECTS/
+#   RESULTS/TMS/RANALYSIS/METHYLKIT_OBJECTS/
 #     methylBase_<cohort>_<context>_cov5_50_mpg<mpg>.rds
 #     methylBase_<cohort>_<context>_cov5_50_mpg<mpg>_mef0.05.rds
 #     summary_<cohort>_<context>_cov5_50_mpg<mpg>_mef0.05.csv
@@ -35,7 +35,7 @@
 #SBATCH -N 1
 #SBATCH -c 24
 #SBATCH --mem=120G
-#SBATCH --job-name=TBS.METHYLKIT
+#SBATCH --job-name=TMS.METHYLKIT
 #SBATCH --output=/path/to/your/project/LOGS/%x_%A_%a.out
 #SBATCH --error=/path/to/your/project/LOGS/%x_%A_%a.err
 #SBATCH --array=0-5%2
@@ -64,8 +64,8 @@ export R_LIBS_USER="/mnt/vast-standard/home/chano/u15584/Rlibs/4.5.2"
 # === USER CONFIGURATION ===
 PROJECT_ROOT="/path/to/your/project"  # <-- set this
 # ===========================
-BAM_DIR="${PROJECT_ROOT}/DATA/TBS/MAPPED.FILES.TBS"
-OUT_BASE="${PROJECT_ROOT}/RESULTS/TBS/RANALYSIS/METHYLKIT_OBJECTS"
+BAM_DIR="${PROJECT_ROOT}/DATA/TMS/MAPPED.FILES.TMS"
+OUT_BASE="${PROJECT_ROOT}/RESULTS/TMS/RANALYSIS/METHYLKIT_OBJECTS"
 TMPDIR="${OUT_BASE}/_tmp_${SLURM_JOB_ID}_${SLURM_ARRAY_TASK_ID}"
 
 mkdir -p "${OUT_BASE}" "${TMPDIR}" "${R_LIBS_USER}"
@@ -81,7 +81,7 @@ cohort="${cohorts[$(( task / 3 ))]}"
 ctx="${contexts[$(( task % 3 ))]}"
 
 echo "============================================================"
-echo "TGC — TBS — Step 5b"
+echo "TGC — TMS — Step 5b"
 echo "Task:   ${task}"
 echo "Cohort: ${cohort}"
 echo "Ctx:    ${ctx}"
@@ -153,7 +153,7 @@ R_SCRIPT="${TMPDIR}/step5b_${cohort}_${ctx}.R"
 cat > "${R_SCRIPT}" << 'RSCRIPT'
 #!/usr/bin/env Rscript
 ############################################################
-# TGC — TBS — Step 5b
+# TGC — TMS — Step 5b
 # Save TWO methylBase RDS per cohort/context:
 #   1) after cov + unite
 #   2) after cov + unite + MEF

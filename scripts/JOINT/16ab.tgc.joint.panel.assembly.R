@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 ############################################################
-# TreeGeneClimate (TGC) — JOINT ECS + TBS
+# TreeGeneClimate (TGC) — JOINT ECS + TMS
 # Step 16ab: Panel assembly — QQ plots and circular Manhattan plots
 #
 # PURPOSE

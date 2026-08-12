@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 ############################################################
-# TreeGeneClimate (TGC) — JOINT ECS + TBS
+# TreeGeneClimate (TGC) — JOINT ECS + TMS
 # Step 15ab: Venn-diagram overlap analysis of significant meQTL markers
 #
 # "Robust" = SNP-site pair significant at p_FDR < 1e-10 in BOTH tools.

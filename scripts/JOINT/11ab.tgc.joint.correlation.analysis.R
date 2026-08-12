@@ -1,13 +1,13 @@
 #!/usr/bin/env Rscript
 ############################################################
-# TreeGeneClimate (TGC) — JOINT (ECS + TBS)
+# TreeGeneClimate (TGC) — JOINT (ECS + TMS)
 # Step 11ab: Distance-based congruence between
-#            genomic (ECS SNPs) and epigenomic (TBS methylation)
+#            genomic (ECS SNPs) and epigenomic (TMS methylation)
 #
 # PURPOSE
 # - For each cohort (BREEDING, NATURAL) and each methylation context (CpG/CHG/CHH):
 #   1) Build a genomic distance matrix from ECS imputed GDS genotypes (IBS distance = 1 - IBS)
-#   2) Build an epigenomic distance matrix from TBS methylBase (Euclidean on filtered+imputed % methylation)
+#   2) Build an epigenomic distance matrix from TMS methylBase (Euclidean on filtered+imputed % methylation)
 #   3) Align samples robustly (trimws + tolower), save diagnostics for mismatches
 #   4) Compare distance matrices:
 #       - Mantel test
@@ -19,8 +19,8 @@
 # - ECS:
 #   RESULTS/ECS/RANALYSIS/RDATA/breeding.imputed.snp.gds
 #   RESULTS/ECS/RANALYSIS/RDATA/natural.imputed.snp.gds
-# - TBS:
-#   RESULTS/TBS/RANALYSIS/METHYLKIT_OBJECTS/
+# - TMS:
+#   RESULTS/TMS/RANALYSIS/METHYLKIT_OBJECTS/
 #     methylBase_<cohort>_<context>_cov5_50_mpg*_mef0.05.rds
 # - Metadata:
 #   DATA/METADATA/breeding_sample2family.txt
@@ -66,8 +66,8 @@ ECS_RDATA_DIR <- file.path(PROJECT_ROOT, "RESULTS/ECS/RANALYSIS/RDATA")
 GDS_BREED <- file.path(ECS_RDATA_DIR, "breeding.imputed.snp.gds")
 GDS_NATUR <- file.path(ECS_RDATA_DIR, "natural.imputed.snp.gds")
 
-# TBS methylKit objects
-TBS_RDS_DIR <- file.path(PROJECT_ROOT, "RESULTS/TBS/RANALYSIS/METHYLKIT_OBJECTS")
+# TMS methylKit objects
+TMS_RDS_DIR <- file.path(PROJECT_ROOT, "RESULTS/TMS/RANALYSIS/METHYLKIT_OBJECTS")
 
 # Metadata maps
 META_DIR <- file.path(PROJECT_ROOT, "DATA/METADATA")
@@ -110,12 +110,12 @@ ensure_file <- function(p) if (!file.exists(p)) stop("Missing file: ", p, call. 
 # Normalise sample IDs to a canonical form for cross-dataset matching
 norm_id <- function(x) tolower(trimws(as.character(x)))
 
-# Select the TBS RDS with the highest mpg threshold (most stringent coverage filter)
-pick_tbs_mef_rds <- function(cohort, ctx) {
+# Select the TMS RDS with the highest mpg threshold (most stringent coverage filter)
+pick_tms_mef_rds <- function(cohort, ctx) {
   pat <- sprintf("^methylBase_%s_%s_cov5_50_mpg[0-9]+_mef0\\.05\\.rds$",
                  tolower(cohort), tolower(ctx))
-  files <- list.files(TBS_RDS_DIR, pattern = pat, full.names = TRUE)
-  if (!length(files)) stop("No TBS MEF RDS found for ", cohort, " / ", ctx, " under ", TBS_RDS_DIR)
+  files <- list.files(TMS_RDS_DIR, pattern = pat, full.names = TRUE)
+  if (!length(files)) stop("No TMS MEF RDS found for ", cohort, " / ", ctx, " under ", TMS_RDS_DIR)
   mpg_num <- as.integer(sub(".*_mpg([0-9]+)_mef0\\.05\\.rds$", "\\1", basename(files)))
   files[which.max(mpg_num)]
 }
@@ -156,7 +156,7 @@ ecs_distance <- function(gds) {
   )
 }
 
-# ---- TBS epigenomic distance: Euclidean on %methylation (sites filtered+imputed) ----
+# ---- TMS epigenomic distance: Euclidean on %methylation (sites filtered+imputed) ----
 methylbase_to_percent_matrix <- function(mb) {
   d <- getData(mb)
   numCs_cols <- grep("^numCs[0-9]+$", colnames(d), value = TRUE)
@@ -182,12 +182,12 @@ methylbase_to_percent_matrix <- function(mb) {
   perc_mat
 }
 
-filter_and_impute_tbs <- function(X_samples_x_sites, max_na_frac) {
+filter_and_impute_tms <- function(X_samples_x_sites, max_na_frac) {
   # Remove sites that are missing in too many samples
   na_frac <- colMeans(is.na(X_samples_x_sites))
   keep1 <- na_frac <= max_na_frac
   X2 <- X_samples_x_sites[, keep1, drop = FALSE]
-  if (ncol(X2) < 10) stop("Too few TBS sites after NA filter (n=", ncol(X2), ").")
+  if (ncol(X2) < 10) stop("Too few TMS sites after NA filter (n=", ncol(X2), ").")
 
   # Mean-impute remaining NAs within each site (column-wise)
   for (j in seq_len(ncol(X2))) {
@@ -203,14 +203,14 @@ filter_and_impute_tbs <- function(X_samples_x_sites, max_na_frac) {
   sds <- apply(X2, 2, sd)
   keep2 <- is.finite(sds) & sds > 0
   X3 <- X2[, keep2, drop = FALSE]
-  if (ncol(X3) < 10) stop("Too few variable TBS sites after SD filter (n=", ncol(X3), ").")
+  if (ncol(X3) < 10) stop("Too few variable TMS sites after SD filter (n=", ncol(X3), ").")
 
   X3
 }
 
-compute_tbs_euclid_dist <- function(tbs_mef_rds, ctx) {
-  ensure_file(tbs_mef_rds)
-  mb <- readRDS(tbs_mef_rds)
+compute_tms_euclid_dist <- function(tms_mef_rds, ctx) {
+  ensure_file(tms_mef_rds)
+  mb <- readRDS(tms_mef_rds)
 
   perc_sites_x_samples <- methylbase_to_percent_matrix(mb)
   # Transpose so rows = samples, columns = sites
@@ -218,7 +218,7 @@ compute_tbs_euclid_dist <- function(tbs_mef_rds, ctx) {
   rownames(X) <- colnames(perc_sites_x_samples)
 
   max_na <- max_na_frac_by_ctx(ctx)
-  X2 <- filter_and_impute_tbs(X, max_na_frac = max_na)
+  X2 <- filter_and_impute_tms(X, max_na_frac = max_na)
   # Euclidean distance across all filtered CpG/CHG/CHH sites (high-dimensional space)
   D <- dist(X2, method = "euclidean")
   list(dist = D, ids = rownames(X2), n_sites = ncol(X2))
@@ -235,7 +235,7 @@ align_dist_by_ids <- function(D1, ids1, D2, ids2, out_diag_prefix) {
   if (any(dup1) || any(dup2)) {
     write_tsv(
       tibble(
-        side = c(rep("ECS", sum(dup1)), rep("TBS", sum(dup2))),
+        side = c(rep("ECS", sum(dup1)), rep("TMS", sum(dup2))),
         id   = c(ids1[dup1], ids2[dup2]),
         norm = c(n1[dup1], n2[dup2])
       ),
@@ -254,8 +254,8 @@ align_dist_by_ids <- function(D1, ids1, D2, ids2, out_diag_prefix) {
 
   write_tsv(tibble(side = "ECS_only", norm_id = only_1, example_id = map1[only_1]),
             file.path(OUT_DIAG, paste0(out_diag_prefix, "_missing_ECSonly.tsv")))
-  write_tsv(tibble(side = "TBS_only", norm_id = only_2, example_id = map2[only_2]),
-            file.path(OUT_DIAG, paste0(out_diag_prefix, "_missing_TBSonly.tsv")))
+  write_tsv(tibble(side = "TMS_only", norm_id = only_2, example_id = map2[only_2]),
+            file.path(OUT_DIAG, paste0(out_diag_prefix, "_missing_TMSonly.tsv")))
 
   if (length(common_norm) < 10) stop("Too few overlapping samples after ID normalization: ", length(common_norm))
 
@@ -355,12 +355,12 @@ for (coh in names(cohorts)) {
   for (ctx in contexts) {
     message("\n--- ", coh, " / ", ctx, " ---")
 
-    tbs_rds <- pick_tbs_mef_rds(coh, ctx)
-    tbs <- compute_tbs_euclid_dist(tbs_rds, ctx)
-    message("TBS: Euclidean distance computed (sites used = ", tbs$n_sites, ")")
+    tms_rds <- pick_tms_mef_rds(coh, ctx)
+    tem <- compute_tms_euclid_dist(tms_rds, ctx)
+    message("TMS: Euclidean distance computed (sites used = ", tem$n_sites, ")")
 
     prefix <- paste0("11ab_", tolower(coh), "_", tolower(ctx))
-    al <- align_dist_by_ids(ecs$dist, ecs$ids, tbs$dist, tbs$ids, out_diag_prefix = prefix)
+    al <- align_dist_by_ids(ecs$dist, ecs$ids, tem$dist, tem$ids, out_diag_prefix = prefix)
     message("Aligned samples: n = ", al$n)
 
     # Mantel test: correlation between the two distance matrices (permutation-based)
@@ -385,14 +385,14 @@ for (coh in names(cohorts)) {
       context = ctx,
       n_samples = al$n,
       ecs_snps_qc = ecs$n_snps,
-      tbs_sites_used = tbs$n_sites,
+      tms_sites_used = tem$n_sites,
       mantel_r = unname(man$statistic),
       mantel_p = unname(man$signif),
       procrustes_t0 = t0,
       procrustes_p = p_pro,
       rv = rv,
       rv_p = p_rv,
-      tbs_rds = tbs_rds
+      tms_rds = tms_rds
     )
 
     out_sum <- file.path(OUT_TAB, paste0(prefix, "_summary.tsv"))
@@ -432,7 +432,7 @@ combined_panel <-
     legend.direction = "horizontal"
   )
 
-out_panel <- file.path(OUT_FIG, "Figure11_ECS_TBS_Procrustes_panel.tiff")
+out_panel <- file.path(OUT_FIG, "Figure11_ECS_TMS_Procrustes_panel.tiff")
 
 # Save in all required publication formats
 tiff(out_panel, width = 34, height = 24, units = "cm", res = 600, compression = "lzw")
@@ -454,7 +454,7 @@ all_df <- bind_rows(summary_rows) %>%
   ) %>%
   arrange(cohort, context)
 
-out_all <- file.path(OUT_TAB, "11ab_ecs_tbs_distance_summary_all.tsv")
+out_all <- file.path(OUT_TAB, "11ab_ecs_tms_distance_summary_all.tsv")
 write_tsv(all_df, out_all)
 
 message("\nDONE 11ab.")

@@ -1,14 +1,14 @@
 #!/bin/bash
 #-------------------------------------------------------------------------------
-# TreeGeneClimate (TGC) — TBS
+# TreeGeneClimate (TGC) — TMS
 # Step 4b1: Bismark methylation extractor (CpG, CHG, CHH)
 # Array-based, 1 sample per task
 #
 # Input:
-#   DATA/TBS/MAPPED.FILES.TBS/*_sorted.bam
+#   DATA/TMS/MAPPED.FILES.TMS/*_sorted.bam
 #
 # Output:
-#   RESULTS/TBS/METHYLATION_CALLS/<SAMPLE>/
+#   RESULTS/TMS/METHYLATION_CALLS/<SAMPLE>/
 #-------------------------------------------------------------------------------
 
 #SBATCH -p YOUR_PARTITION
@@ -17,7 +17,7 @@
 #SBATCH -c 24
 #SBATCH --mem=100G
 #SBATC -C ssd
-#SBATCH --job-name=TBS.MEX
+#SBATCH --job-name=TMS.MEX
 #SBATCH --output=/path/to/your/project/LOGS/%x_%A_%a.out
 #SBATCH --error=/path/to/your/project/LOGS/%x_%A_%a.err
 #SBATCH --array=20-601%4
@@ -36,8 +36,8 @@ module load samtools/1.21
 PROJECT_ROOT="/path/to/your/project"  # <-- set this
 # ===========================
 
-INPUT="${PROJECT_ROOT}/DATA/TBS/MAPPED.FILES.TBS"
-OUTPUT_BASE="${PROJECT_ROOT}/RESULTS/TBS/METHYLATION_CALLS"
+INPUT="${PROJECT_ROOT}/DATA/TMS/MAPPED.FILES.TMS"
+OUTPUT_BASE="${PROJECT_ROOT}/RESULTS/TMS/METHYLATION_CALLS"
 REF="${PROJECT_ROOT}/REFERENCE/Picab02_genome.assembly/bismark"
 
 mkdir -p "${OUTPUT_BASE}"

@@ -50,15 +50,15 @@ scripts/
 
 | Step | Script | Description |
 |------|--------|-------------|
-| 1b | `1b.tgc.tbs.fastqc.rawdata.sh` | FastQC on raw reads |
-| 2b | `2b.tgc.tbs.trimmomatic.and.fastqc.trimmed.sh` | Trimmomatic + FastQC |
-| 3b | `3b.tgc.tbs.bismark.trimmed.sh` | Bismark alignment |
-| 4b1 | `4b1.tgc.tbs.meth.extractor.array.sh` | Methylation extraction |
-| 4b2 | `4b2.tgc.tbs.meth.filtering.array.sh` | Coverage filtering |
-| 5b | `5b.tgc.methylkit.filtering.sh` / `5b.tgc.tbs.import.data.methylkit.R` | methylKit import and filtering |
-| 6b | `6b.tgc.tbs.methylation.levels.anova.R` | Methylation level ANOVAs |
-| 7b | `7b.tgc.tbs.pcs.dapc.heatmaps.R` | PCA, DAPC, heatmaps |
-| 8b | `8b.tgc.tbs.heatmaps.R` | Heatmap figures |
+| 1b | `1b.tgc.tms.fastqc.rawdata.sh` | FastQC on raw reads |
+| 2b | `2b.tgc.tms.trimmomatic.and.fastqc.trimmed.sh` | Trimmomatic + FastQC |
+| 3b | `3b.tgc.tms.bismark.trimmed.sh` | Bismark alignment |
+| 4b1 | `4b1.tgc.tms.meth.extractor.array.sh` | Methylation extraction |
+| 4b2 | `4b2.tgc.tms.meth.filtering.array.sh` | Coverage filtering |
+| 5b | `5b.tgc.methylkit.filtering.sh` / `5b.tgc.tms.import.data.methylkit.R` | methylKit import and filtering |
+| 6b | `6b.tgc.tms.methylation.levels.anova.R` | Methylation level ANOVAs |
+| 7b | `7b.tgc.tms.pcs.dapc.heatmaps.R` | PCA, DAPC, heatmaps |
+| 8b | `8b.tgc.tms.heatmaps.R` | Heatmap figures |
 
 ### Joint analyses
 

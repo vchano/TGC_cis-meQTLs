@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 ############################################################
-# TreeGeneClimate (TGC) — TBS
+# TreeGeneClimate (TGC) — TMS
 # Step 6b (UPDATED): Plot methylation level (%) per group
 #   - Breeding cohort: per family (17 families) -> panels a/b/c
 #   - Natural cohort:  per stand  (25 stands)   -> panels d/e/f
@@ -20,16 +20,16 @@
 #
 # INPUT:
 #   RDS from Step 5b (after unite) in:
-#     .../RESULTS/TBS/RANALYSIS/METHYLKIT_OBJECTS/
+#     .../RESULTS/TMS/RANALYSIS/METHYLKIT_OBJECTS/
 #   Expected naming (examples):
 #     methylBase_breeding_cpg_cov5_50_mpg168.rds
 #     methylBase_breeding_cpg_cov5_50_mpg168_mef0.05.rds
 #
 # OUTPUT:
 #   Figures:
-#     .../RESULTS/TBS/RANALYSIS/FIGURES/FIG3_FIG4/
+#     .../RESULTS/TMS/RANALYSIS/FIGURES/FIG3_FIG4/
 #   Logs + posthoc tables:
-#     .../RESULTS/TBS/RANALYSIS/ANOVA.METHYL.LEVEL/
+#     .../RESULTS/TMS/RANALYSIS/ANOVA.METHYL.LEVEL/
 ############################################################
 
 ## ---------------------------
@@ -56,9 +56,9 @@ suppressPackageStartupMessages({
 PROJECT_ROOT <- "/path/to/your/project"  # <-- set this
 # ===========================
 
-rds_dir  <- file.path(PROJECT_ROOT, "RESULTS/TBS/RANALYSIS/METHYLKIT_OBJECTS")
-fig_dir  <- file.path(PROJECT_ROOT, "RESULTS/TBS/RANALYSIS/FIGURES/FIG3_FIG4")
-log_dir  <- file.path(PROJECT_ROOT, "RESULTS/TBS/RANALYSIS/ANOVA.METHYL.LEVEL")
+rds_dir  <- file.path(PROJECT_ROOT, "RESULTS/TMS/RANALYSIS/METHYLKIT_OBJECTS")
+fig_dir  <- file.path(PROJECT_ROOT, "RESULTS/TMS/RANALYSIS/FIGURES/FIG3_FIG4")
+log_dir  <- file.path(PROJECT_ROOT, "RESULTS/TMS/RANALYSIS/ANOVA.METHYL.LEVEL")
 
 # Tab-delimited files mapping sample IDs to family (breeding) or population (natural)
 map_file_breeding <- file.path(PROJECT_ROOT, "DATA/METADATA/breeding_sample2family.txt")
@@ -346,7 +346,7 @@ analyze_one_clean <- function(cohort, ctx, map_path, color_vec,
 ## RUN ALL 6
 ## ---------------------------
 sink(log_file)
-cat("TGC — TBS — Step 6b (updated style)\n")
+cat("TGC — TMS — Step 6b (updated style)\n")
 cat("Timestamp: ", format(Sys.time()), "\n\n", sep = "")
 
 cat("RDS dir:  ", rds_dir, "\n", sep = "")

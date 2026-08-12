@@ -1,24 +1,24 @@
 #!/bin/bash
 #-------------------------------------------------------------------------------
-# TreeGeneClimate (TGC) — TBS
-# Step 1b: FASTQC + MULTIQC on RAW FASTQ (TBS)
+# TreeGeneClimate (TGC) — TMS
+# Step 1b: FASTQC + MULTIQC on RAW FASTQ (TMS)
 #
 # Project root:
 #   /path/to/your/project
 #
 # Input (data, frozen):
-#   DATA/TBS/RAWDATA.TBS/*.fastq.gz
+#   DATA/TMS/RAWDATA.TMS/*.fastq.gz
 #
 # Output (results):
-#   RESULTS/TBS/QC/RAWDATA/FASTQC/
-#   RESULTS/TBS/QC/RAWDATA/MULTIQC/
+#   RESULTS/TMS/QC/RAWDATA/FASTQC/
+#   RESULTS/TMS/QC/RAWDATA/MULTIQC/
 #-------------------------------------------------------------------------------
 
 #SBATCH --account=YOUR_ACCOUNT
 #SBATCH --partition=YOUR_PARTITION
 #SBATCH -n 48
 #SBATCH -N 1
-#SBATCH --job-name=TBS.FQC1
+#SBATCH --job-name=TMS.FQC1
 #SBATCH --output=/path/to/your/project/LOGS/%x_%j.out
 #SBATCH --error=/path/to/your/project/LOGS/%x_%j.err
 #SBATCH --ntasks-per-socket 24
@@ -37,9 +37,9 @@ module load anaconda3/2020.11
 PROJECT_ROOT="/path/to/your/project"  # <-- set this
 # ===========================
 
-INPUT="${PROJECT_ROOT}/DATA/TBS/RAWDATA.TBS"
+INPUT="${PROJECT_ROOT}/DATA/TMS/RAWDATA.TMS"
 
-QC_BASE="${PROJECT_ROOT}/RESULTS/TBS/QC/RAWDATA"
+QC_BASE="${PROJECT_ROOT}/RESULTS/TMS/QC/RAWDATA"
 QC_FASTQC="${QC_BASE}/FASTQC"
 QC_MULTIQC="${QC_BASE}/MULTIQC"
 

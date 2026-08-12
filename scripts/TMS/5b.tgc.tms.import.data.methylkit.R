@@ -1,16 +1,16 @@
 #!/usr/bin/env Rscript
 ############################################################
-# TreeGeneClimate (TGC) — TBS
+# TreeGeneClimate (TGC) — TMS
 # Step 5b: methylKit import from Bismark BAMs by cohort + context,
 #          filter coverage (5–50x) and MEF (>0.05),
 #          save methylBase objects + site-count summary table
 #
 # INPUT:
-#   /path/to/your/project/DATA/TBS/MAPPED.FILES.TBS/
+#   /path/to/your/project/DATA/TMS/MAPPED.FILES.TMS/
 #     <SAMPLE>_R1_p_bismark_bt2_pe.bam
 #
 # OUTPUT:
-#   /path/to/your/project/RESULTS/TBS/RANALYSIS/METHYLKIT_OBJECTS/
+#   /path/to/your/project/RESULTS/TMS/RANALYSIS/METHYLKIT_OBJECTS/
 #     methylBase_breeding_cpg_cov5_50_mef0.05.rds
 #     methylBase_breeding_chg_cov5_50_mef0.05.rds
 #     methylBase_breeding_chh_cov5_50_mef0.05.rds
@@ -34,8 +34,8 @@ suppressPackageStartupMessages({
 # === USER CONFIGURATION ===
 PROJECT_ROOT <- "/path/to/your/project"  # <-- set this
 # ===========================
-BAM_DIR      <- file.path(PROJECT_ROOT, "DATA/TBS/MAPPED.FILES.TBS")
-OUT_DIR      <- file.path(PROJECT_ROOT, "RESULTS/TBS/RANALYSIS/METHYLKIT_OBJECTS")
+BAM_DIR      <- file.path(PROJECT_ROOT, "DATA/TMS/MAPPED.FILES.TMS")
+OUT_DIR      <- file.path(PROJECT_ROOT, "RESULTS/TMS/RANALYSIS/METHYLKIT_OBJECTS")
 
 dir.create(OUT_DIR, recursive = TRUE, showWarnings = FALSE)
 

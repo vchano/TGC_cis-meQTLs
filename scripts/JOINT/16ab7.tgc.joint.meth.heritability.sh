@@ -1,6 +1,6 @@
 #!/bin/bash
 ############################################################
-# TreeGeneClimate (TGC) — JOINT ECS + TBS
+# TreeGeneClimate (TGC) — JOINT ECS + TMS
 # Step 16ab7: Methylation heritability — SLURM submission
 #
 # For small datasets: run the R script directly.

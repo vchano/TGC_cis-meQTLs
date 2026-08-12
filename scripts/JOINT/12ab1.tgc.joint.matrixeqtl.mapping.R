@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 ############################################################
-# TreeGeneClimate (TGC) — JOINT ECS + TBS
+# TreeGeneClimate (TGC) — JOINT ECS + TMS
 # Step 12ab1: MatrixEQTL5 cis-meQTL mapping
 #
 # KEY DIFFERENCES vs 15ab2 (MatrixEQTL4):

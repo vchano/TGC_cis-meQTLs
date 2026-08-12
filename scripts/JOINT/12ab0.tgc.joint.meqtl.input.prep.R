@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 ############################################################
-# TreeGeneClimate (TGC) — JOINT ECS + TBS
+# TreeGeneClimate (TGC) — JOINT ECS + TMS
 # Step 12ab0: Prepare meQTL5 inputs (OLD-style inputs)
 #
 # KEY DIFFERENCES vs 15ab0 (meQTL4):
@@ -78,7 +78,7 @@ for (f in c(LOGFILE, SUMMARY_FILE, OVERLAP_FILE))
 
 # --- OLD-STYLE input paths ---
 RDATA_DIR   <- "/mnt/vast-standard/home/chano/u15584/treegeneclimate/2025/ECS/RDATA"
-TBS_RDS_DIR <- "/scratch-scc/users/u15584/TGC/TBS/2025_NEW.ANALYSIS/METHYLKIT.FILES.TBS"
+TMS_RDS_DIR <- "/scratch-scc/users/u15584/TGC/TMS/2025_NEW.ANALYSIS/METHYLKIT.FILES.TMS"
 
 # Non-imputed GDS files — imputed GDS is used only in step 11ab
 GDS_FILES <- list(
@@ -333,7 +333,7 @@ for (cohort in COHORTS) {
     # --- Load unfiltered methylKit RDS → M-values (NO QN) ---
     ctx_lower <- tolower(context)
     coh_lower <- tolower(cohort)
-    meth_path <- file.path(TBS_RDS_DIR,
+    meth_path <- file.path(TMS_RDS_DIR,
                            paste0(coh_lower, "_", context, "_methylkit.rds"))
     if (!file.exists(meth_path)) {
       log_msg("  Missing methylKit RDS — skipping: ", meth_path)
