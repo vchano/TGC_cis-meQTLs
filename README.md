@@ -101,8 +101,8 @@ scripts/
 | Data type | Repository | Accession |
 |-----------|-----------|-----------|
 | Raw ECS fastq (FASTQ) | NCBI SRA | [pending] |
-| Raw TMS fastq (FASTQ) | NCBI SRA / GEO | [pending] |
-| Methylation matrices | NCBI GEO | [pending] |
+| Raw TMS fastq (FASTQ) | NCBI SRA | [pending] |
+| Methylation matrices | GRO.data | [pending] |
 | Filtered VCF, GDS, meQTL inputs/results | GRO.data | [pending] |
 
 ## Citation
