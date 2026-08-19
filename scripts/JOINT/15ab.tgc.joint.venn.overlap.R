@@ -233,9 +233,11 @@ draw_venn <- function(set_list, fill_colors, panel_label = NULL, sname_size = 7)
   if (n == 2)
     p <- p + coord_fixed(ratio = 1, clip = "off")
 
-  if (!is.null(panel_label))
-    p <- p + labs(tag = panel_label) +
-      theme(plot.tag = element_text(size = 22, face = "plain", hjust = 0))
+  if (!is.null(panel_label)) {
+    lbl_up <- toupper(sub("[)]$", "", panel_label))
+    p <- p + labs(tag = lbl_up) +
+      theme(plot.tag = element_text(size = 22, face = "bold", hjust = 0))
+  }
 
   p
 }
@@ -295,12 +297,14 @@ for (tool in TOOLS) {
 
 log_msg("Building robust sets (intersection of both tools)...")
 
-robust      <- list()   # pair-level robust (same snp+site in both tools) — used for tables
-robust_snps <- list()   # SNP-level robust  (same SNP in both tools)     — used for Venns
+robust         <- list()   # pair-level robust (same snp+site in both tools) — used for tables
+robust_snps    <- list()   # SNP-level robust  (same SNP in both tools)     — used for Venns
+robust_snp_pos <- list()   # position-key robust ("chr:pos") for cross-cohort comparison
 
 for (cohort in COHORTS) {
-  robust[[cohort]]      <- list()
-  robust_snps[[cohort]] <- list()
+  robust[[cohort]]         <- list()
+  robust_snps[[cohort]]    <- list()
+  robust_snp_pos[[cohort]] <- list()
   for (ctx in CONTEXTS) {
     g5  <- sig_raw[["GENESIS5"   ]][[cohort]]
     me5 <- sig_raw[["MATRIXEQTL5"]][[cohort]]
@@ -310,8 +314,9 @@ for (cohort in COHORTS) {
     if (!nrow(g5) || !nrow(me5) ||
         !"context" %in% names(g5) || !"context" %in% names(me5) ||
         !"p_FDR"   %in% names(g5) || !"p_FDR"   %in% names(me5)) {
-      robust[[cohort]][[ctx]]      <- empty
-      robust_snps[[cohort]][[ctx]] <- character(0)
+      robust[[cohort]][[ctx]]         <- empty
+      robust_snps[[cohort]][[ctx]]    <- character(0)
+      robust_snp_pos[[cohort]][[ctx]] <- character(0)
       next
     }
 
@@ -320,8 +325,9 @@ for (cohort in COHORTS) {
 
     if (!nrow(g5_sub) || !nrow(me5_sub)) {
       log_msg("  ", cohort, "/", ctx, ": one or both tools have 0 pairs")
-      robust[[cohort]][[ctx]]      <- empty
-      robust_snps[[cohort]][[ctx]] <- character(0)
+      robust[[cohort]][[ctx]]         <- empty
+      robust_snps[[cohort]][[ctx]]    <- character(0)
+      robust_snp_pos[[cohort]][[ctx]] <- character(0)
       next
     }
 
@@ -346,8 +352,15 @@ for (cohort in COHORTS) {
 
     # SNP-level robust: SNPs significant in both tools (regardless of which site)
     robust_snps[[cohort]][[ctx]] <- intersect(unique(g5_sub$snp), unique(me5_sub$snp))
+    # Position-based identifiers (chr:pos) for cross-cohort comparison in Main A Venns.
+    # robust_snps integers are cohort-specific sequential IDs — not comparable across cohorts.
+    robust_snp_pos[[cohort]][[ctx]] <- unique(
+      g5_sub[snp %in% robust_snps[[cohort]][[ctx]],
+             paste0(snp_chr, ":", snp_pos)]
+    )
     log_msg("  ", cohort, "/", ctx, ": ",
-            length(robust_snps[[cohort]][[ctx]]), " SNPs (SNP-level robust)")
+            length(robust_snps[[cohort]][[ctx]]), " SNPs (SNP-level robust) | ",
+            length(robust_snp_pos[[cohort]][[ctx]]), " unique positions")
   }
 }
 
@@ -411,8 +424,8 @@ for (ctx in CONTEXTS) {
   log_msg("  Panel ", lbl, "  [", ctx, "]")
 
   # Robust SNPs per cohort: markers detected by both tools in the same cohort
-  breed_snps   <- robust_snps[["BREEDING"]][[ctx]]
-  natural_snps <- robust_snps[["NATURAL" ]][[ctx]]
+  breed_snps   <- robust_snp_pos[["BREEDING"]][[ctx]]
+  natural_snps <- robust_snp_pos[["NATURAL" ]][[ctx]]
 
   set_list <- list()
   if (length(breed_snps))   set_list[["BREEDING"]] <- breed_snps
