@@ -75,18 +75,6 @@ scripts/
 | 17ab | `17ab.tgc.joint.marker.annotation.R` / `.sh` | Marker annotation against reference GFF3 |
 | 18ab | `18ab.tgc.joint.summary.tables.R` | Manuscript summary tables (ECS + TMS) |
 
-## Population correction
-
-During quality control of the natural cohort metadata, sample **P004_WA01** was
-found to have been incorrectly assigned to the natural stand *Pieksämäen*; the
-correct assignment is **Leppävirta**. The natural cohort therefore comprises
-**25 stands** (not 26), as one stand (Pieksämäen) was represented by a single
-mis-labelled sample.
-
-This correction is incorporated directly in the analysis scripts. Wherever
-sample population labels are loaded, P004_WA01 is reassigned to Leppävirta
-before any downstream computation.
-
 ## Dependencies
 
 **Tools (via HPC modules):**
