@@ -134,7 +134,7 @@ FS_LABEL <- 16  # panel label font size (a), b), c) …)
 # annotation bars on both axes. The legend shows evenly spaced "pretty" breaks
 # rather than exact quantiles so tick labels are readable.
 plot_grm_heatmap <- function(G, groups, palette_named, out_file, title_label = "a)",
-                             dpi = 600, w_cm = 16, h_cm = 16,
+                             dpi = 600, w_cm = 20, h_cm = 16,
                              n_breaks = 5, key_digits = 2) {
   G <- as.matrix(G)
   ids <- rownames(G)
@@ -195,7 +195,7 @@ plot_grm_heatmap <- function(G, groups, palette_named, out_file, title_label = "
   # across TIFF, PDF, EPS and PNG outputs
   draw_heatmap <- function() {
     draw(ht, heatmap_legend_side = "right", annotation_legend_side = "right",
-         merge_legend = TRUE, show_annotation_legend = FALSE)
+         merge_legend = TRUE, show_annotation_legend = TRUE)
     # Panel label (e.g. "a)") placed in the top-left corner using grid coordinates
     grid.text(title_label, x = unit(0.35, "cm"),
               y = unit(1, "npc") - unit(0.35, "cm"),
@@ -463,7 +463,7 @@ save_tiff_with_label <- function(plot_obj, out_file, title_label,
 #                          c) GRM natural,  d) IBD natural ----
 # Uses grid viewports to tile four sub-figures into a single 32×32 cm canvas.
 save_fig2_panel <- function(ht_b, ht_n, p_ibd_b, p_ibd_n, out_file,
-                             dpi = 600, w_cm = 32, h_cm = 32) {
+                             dpi = 600, w_cm = 38, h_cm = 32) {
   draw_panel <- function() {
     grid.newpage()
 
@@ -472,7 +472,7 @@ save_fig2_panel <- function(ht_b, ht_n, p_ibd_b, p_ibd_n, out_file,
                           just = c("left", "bottom")))
     draw(ht_b, newpage = FALSE,
          heatmap_legend_side = "right", annotation_legend_side = "right",
-         merge_legend = TRUE, show_annotation_legend = FALSE)
+         merge_legend = TRUE, show_annotation_legend = TRUE)
     grid.text("a)", x = unit(0.35, "cm"), y = unit(1, "npc") - unit(0.35, "cm"),
               just = c("left", "top"), gp = gpar(fontsize = FS_LABEL))
     popViewport()
@@ -490,7 +490,7 @@ save_fig2_panel <- function(ht_b, ht_n, p_ibd_b, p_ibd_n, out_file,
                           just = c("left", "bottom")))
     draw(ht_n, newpage = FALSE,
          heatmap_legend_side = "right", annotation_legend_side = "right",
-         merge_legend = TRUE, show_annotation_legend = FALSE)
+         merge_legend = TRUE, show_annotation_legend = TRUE)
     grid.text("c)", x = unit(0.35, "cm"), y = unit(1, "npc") - unit(0.35, "cm"),
               just = c("left", "top"), gp = gpar(fontsize = FS_LABEL))
     popViewport()
@@ -531,12 +531,13 @@ grp_b_vec <- setNames(as.character(ann_b$Family), ann_b$IID)
 grp_n_vec <- setNames(as.character(ann_n$Population), ann_n$IID)
 
 # ==============================================================================
-# 7) FIGURE 1a / 2a : GRM heatmaps (16x16 cm), "nice" key labels, no group legend
+# 7) FIGURE 1a / 2a : GRM heatmaps with family/stand annotation legends
 # ==============================================================================
 out_1a <- file.path(FIG_DIR, "Figure1a_breeding.tiff")
 out_2a <- file.path(FIG_DIR, "Figure2a_natural.tiff")
 res_1a <- plot_grm_heatmap(G_b, grp_b_vec, colors.17, out_1a, title_label = "a)", key_digits = 2)
-res_2a <- plot_grm_heatmap(G_n, grp_n_vec, colors.25, out_2a, title_label = "a)", key_digits = 2)
+res_2a <- plot_grm_heatmap(G_n, grp_n_vec, colors.25, out_2a, title_label = "a)", key_digits = 2,
+                            w_cm = 24)
 
 # ==============================================================================
 # 8) FIGURE 1b / 2b : IBD violins using PLINK PI_HAT (16x16 cm)

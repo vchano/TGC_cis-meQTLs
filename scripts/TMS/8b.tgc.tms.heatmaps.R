@@ -608,12 +608,12 @@ out_b_all <- file.path(fig_dir, sprintf("Figure7a2_HEATMAP_breeding_top%d_OVERAL
 save_heatmap_tiff(res_b$X_sel_bal, res_b$group_vec, colors.17, res_b$ctx_vec_bal,
                   group_legend_title = "Family",
                   out_file = out_b_bal, title_label = "a)",
-                  w_cm = 20, h_cm = 20, dpi = 600)
+                  w_cm = 24, h_cm = 20, dpi = 600)
 
 save_heatmap_tiff(res_b$X_sel_all, res_b$group_vec, colors.17, res_b$ctx_vec_all,
                   group_legend_title = "Family",
                   out_file = out_b_all, title_label = "a)",
-                  w_cm = 20, h_cm = 20, dpi = 600)
+                  w_cm = 24, h_cm = 20, dpi = 600)
 
 # ---- NATURAL
 res_n <- process_cohort_for_heatmap("NATURAL", map_file_natural, colors.25, top_n = topN)
@@ -624,12 +624,12 @@ out_n_all <- file.path(fig_dir, sprintf("Figure7b2_HEATMAP_natural_top%d_OVERALL
 save_heatmap_tiff(res_n$X_sel_bal, res_n$group_vec, colors.25, res_n$ctx_vec_bal,
                   group_legend_title = "Natural stand",
                   out_file = out_n_bal, title_label = "b)",
-                  w_cm = 20, h_cm = 20, dpi = 600)
+                  w_cm = 24, h_cm = 20, dpi = 600)
 
 save_heatmap_tiff(res_n$X_sel_all, res_n$group_vec, colors.25, res_n$ctx_vec_all,
                   group_legend_title = "Natural stand",
                   out_file = out_n_all, title_label = "b)",
-                  w_cm = 20, h_cm = 20, dpi = 600)
+                  w_cm = 24, h_cm = 20, dpi = 600)
 
 # ==============================================================================
 # 6) NATURAL: FORMAL SVMPs ONLY (padj < 0.05) + COMBINED PANEL (a + b)
@@ -669,12 +669,12 @@ if (nrow(sig_df) >= 2) {
                     title_label      = "b)",
                     cluster_cols     = TRUE,
                     show_annot_names = FALSE,   # annotation names omitted for the narrow panel
-                    w_cm = 12, h_cm = 20, dpi = 600)
+                    w_cm = 16, h_cm = 20, dpi = 600)
 
   # ---- Combined panel (a + b)
   # Breeding balanced (150 markers) gets 70% of width;
-  # Natural formal SVMPs (6 markers) gets 30% — not proportional, readable.
-  panel_w_cm <- 28
+  # Natural formal SVMPs gets 30% — extra width ensures "Methylation context" legend fits.
+  panel_w_cm <- 32
   panel_h_cm <- 20
   frac_a     <- 0.70
   label_gp   <- gpar(fontsize = 16)   # no bold
@@ -685,7 +685,7 @@ if (nrow(sig_df) >= 2) {
     group_vec             = res_b$group_vec,
     group_palette         = colors.17,
     context_vec           = res_b$ctx_vec_bal,
-    group_legend_title    = "Breeding family",
+    group_legend_title    = "Family",
     show_legends          = TRUE,
     cluster_cols          = TRUE,
     show_annot_names      = FALSE   # no sidebar / topbar labels in the plot
