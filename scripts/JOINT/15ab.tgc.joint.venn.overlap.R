@@ -292,6 +292,39 @@ for (tool in TOOLS) {
 }
 
 ############################################################
+# 4b) LOAD SNP POSITION ANNOTATION
+#     snp_variant_annot.rds has the ground-truth genomic positions.
+#     GENESIS snp_pos in the sig files uses a different coordinate system
+#     (GDS-internal), so we always look up positions from va.
+############################################################
+
+ANNOT_ROOT <- file.path(PROJECT_ROOT, "RESULTS", "JOINT", "MQTL5", "INPUTS")
+
+va_map <- list()   # va_map[[cohort]][[ctx]]: named char vector  pos_string[snp_id]
+for (cohort in COHORTS) {
+  va_map[[cohort]] <- list()
+  for (ctx in CONTEXTS) {
+    va_path <- file.path(ANNOT_ROOT, cohort, ctx, "snp_variant_annot.rds")
+    if (file.exists(va_path)) {
+      va <- as.data.table(readRDS(va_path))
+      va_map[[cohort]][[ctx]] <- setNames(paste0(va$chr, ":", va$pos),
+                                          as.character(va$snp_id))
+      log_msg("  va_map loaded: ", cohort, "/", ctx,
+              " (", length(va_map[[cohort]][[ctx]]), " SNPs)")
+    } else {
+      log_msg("  va_map MISSING: ", va_path)
+      va_map[[cohort]][[ctx]] <- character(0)
+    }
+  }
+}
+
+# Helper: convert integer SNP IDs to unique genomic position strings via va_map
+ids_to_pos <- function(ids, va_lookup) {
+  pos <- va_lookup[as.character(ids)]
+  unique(pos[!is.na(pos) & nchar(pos) > 0])
+}
+
+############################################################
 # 5) BUILD ROBUST SETS  (intersection of both tools, per cohort × context)
 ############################################################
 
@@ -350,14 +383,16 @@ for (cohort in COHORTS) {
     log_msg("  ", cohort, "/", ctx, ": ", nrow(both), " robust pairs | ",
             uniqueN(both$site), " sites | ", uniqueN(both$snp), " SNPs (pair-level)")
 
-    # SNP-level robust: SNPs significant in both tools (regardless of which site)
+    # Position-based robust set: positions significant in BOTH tools.
+    # Using va_map (snp_variant_annot.rds) as ground-truth coordinates because
+    # GENESIS snp_pos uses a GDS-internal coordinate system that differs from
+    # the true genomic bp positions in the SNP annotation file.
+    g5_pos  <- ids_to_pos(unique(g5_sub$snp),  va_map[[cohort]][[ctx]])
+    me5_pos <- ids_to_pos(unique(me5_sub$snp), va_map[[cohort]][[ctx]])
+    robust_snp_pos[[cohort]][[ctx]] <- intersect(g5_pos, me5_pos)
+
+    # Integer-ID robust (kept for pair-level table joins within a single cohort)
     robust_snps[[cohort]][[ctx]] <- intersect(unique(g5_sub$snp), unique(me5_sub$snp))
-    # Position-based identifiers (chr:pos) for cross-cohort comparison in Main A Venns.
-    # robust_snps integers are cohort-specific sequential IDs — not comparable across cohorts.
-    robust_snp_pos[[cohort]][[ctx]] <- unique(
-      g5_sub[snp %in% robust_snps[[cohort]][[ctx]],
-             paste0(snp_chr, ":", snp_pos)]
-    )
     log_msg("  ", cohort, "/", ctx, ": ",
             length(robust_snps[[cohort]][[ctx]]), " SNPs (SNP-level robust) | ",
             length(robust_snp_pos[[cohort]][[ctx]]), " unique positions")
@@ -383,24 +418,22 @@ get_sites <- function(dt, ctx) {
   unique(dt[context == ctx, site])
 }
 
-# Integer-ID helper: within one cohort×context both tools index the same
-# SNP matrix (same row order), so the integer snp ID is directly comparable.
-# snp_pos is NOT used here because MatrixEQTL stores the matrix row index in
-# that column, not a genomic bp position — position strings never match.
-get_snps <- function(dt, ctx) {
-  if (!nrow(dt) || !"context" %in% names(dt)) return(character(0))
-  unique(dt[context == ctx, snp])
-}
-
 for (cohort in COHORTS) {
   for (ctx in CONTEXTS) {
     key <- paste0(cohort, "_", ctx)
     lbl <- SUPP_LABELS[[key]]
     log_msg("  Panel ", lbl, "  [", cohort, " / ", ctx, "]")
 
-    # Supplementary Venns compare tool agreement — unit: SNP integer IDs (same matrix, comparable within cohort)
-    g5_snps  <- get_snps(sig_raw[["GENESIS5"   ]][[cohort]], ctx)
-    me5_snps <- get_snps(sig_raw[["MATRIXEQTL5"]][[cohort]], ctx)
+    # Supplementary Venns: unit = unique genomic positions (chr:pos) via va_map.
+    # Convert each tool's significant integer IDs to true genomic positions using
+    # snp_variant_annot.rds — the ground-truth coordinate for this cohort x context.
+    g5_sub_ctx  <- sig_raw[["GENESIS5"   ]][[cohort]]
+    me5_sub_ctx <- sig_raw[["MATRIXEQTL5"]][[cohort]]
+    if ("context" %in% names(g5_sub_ctx))  g5_sub_ctx  <- g5_sub_ctx [context == ctx]
+    if ("context" %in% names(me5_sub_ctx)) me5_sub_ctx <- me5_sub_ctx[context == ctx]
+
+    g5_snps  <- ids_to_pos(unique(g5_sub_ctx$snp),  va_map[[cohort]][[ctx]])
+    me5_snps <- ids_to_pos(unique(me5_sub_ctx$snp), va_map[[cohort]][[ctx]])
 
     set_list <- list()
     if (length(g5_snps))  set_list[["GENESIS5"]]    <- g5_snps
