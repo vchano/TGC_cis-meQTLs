@@ -383,12 +383,13 @@ get_sites <- function(dt, ctx) {
   unique(dt[context == ctx, site])
 }
 
-# Position-based helper: avoids allele-ID inflation from multi-allelic sites.
-# Within a cohort the same tool's IDs are directly comparable, but using
-# chr:pos keeps units consistent with the main-panel Venns (sections 7-8).
-get_snp_pos <- function(dt, ctx) {
+# Integer-ID helper: within one cohort×context both tools index the same
+# SNP matrix (same row order), so the integer snp ID is directly comparable.
+# snp_pos is NOT used here because MatrixEQTL stores the matrix row index in
+# that column, not a genomic bp position — position strings never match.
+get_snps <- function(dt, ctx) {
   if (!nrow(dt) || !"context" %in% names(dt)) return(character(0))
-  unique(dt[context == ctx, paste0(snp_chr, ":", snp_pos)])
+  unique(dt[context == ctx, snp])
 }
 
 for (cohort in COHORTS) {
@@ -397,9 +398,9 @@ for (cohort in COHORTS) {
     lbl <- SUPP_LABELS[[key]]
     log_msg("  Panel ", lbl, "  [", cohort, " / ", ctx, "]")
 
-    # Supplementary Venns compare tool agreement — unit: unique genomic positions (SNP chr:pos)
-    g5_snps  <- get_snp_pos(sig_raw[["GENESIS5"   ]][[cohort]], ctx)
-    me5_snps <- get_snp_pos(sig_raw[["MATRIXEQTL5"]][[cohort]], ctx)
+    # Supplementary Venns compare tool agreement — unit: SNP integer IDs (same matrix, comparable within cohort)
+    g5_snps  <- get_snps(sig_raw[["GENESIS5"   ]][[cohort]], ctx)
+    me5_snps <- get_snps(sig_raw[["MATRIXEQTL5"]][[cohort]], ctx)
 
     set_list <- list()
     if (length(g5_snps))  set_list[["GENESIS5"]]    <- g5_snps
