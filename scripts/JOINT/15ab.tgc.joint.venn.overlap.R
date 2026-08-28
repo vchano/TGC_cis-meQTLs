@@ -148,7 +148,7 @@ log_msg <- function(...) {
 save_plot <- function(gg, base_path,
                       width_cm = OUT_W, height_cm = OUT_H) {
   if (is.null(gg)) return(invisible(NULL))
-  for (fmt in c("tiff", "pdf", "eps", "png")) {
+  for (fmt in c("tiff", "pdf", "eps", "png", "svg")) {
     out    <- paste0(base_path, ".", fmt)
     dev    <- if (fmt == "eps") cairo_ps else fmt
     dpi    <- if (fmt %in% c("tiff", "png")) OUT_RES else 150
@@ -406,7 +406,7 @@ for (cohort in COHORTS) {
     if (length(me5_snps)) set_list[["MATRIXEQTL5"]] <- me5_snps
 
     base <- file.path(SUPP_DIR,
-      paste0("venn_tools_", tolower(cohort), "_", tolower(ctx)))
+      paste0("venn_tools_", tolower(cohort), "_", tolower(ctx), "_corrected"))
 
     gg <- draw_venn(set_list, SUPP_FILL_COLORS[[key]], lbl, sname_size = 5.5)
     supp_plots[[key]] <- gg
@@ -433,7 +433,7 @@ for (ctx in CONTEXTS) {
   if (length(breed_snps))   set_list[["BREEDING"]] <- breed_snps
   if (length(natural_snps)) set_list[["NATURAL"]]  <- natural_snps
 
-  base <- file.path(MAIN_DIR, paste0("venn_cohorts_", tolower(ctx)))
+  base <- file.path(MAIN_DIR, paste0("venn_cohorts_", tolower(ctx), "_corrected"))
 
   gg <- draw_venn(set_list, COHORT_FILL_COLORS[[ctx]], lbl, sname_size = 5.5)
   cohort_plots[[ctx]] <- gg
@@ -458,7 +458,7 @@ for (cohort in COHORTS) {
     if (length(snps)) snp_sets[[ctx]] <- snps
   }
 
-  base <- file.path(MAIN_DIR, paste0("venn_contexts_", tolower(cohort)))
+  base <- file.path(MAIN_DIR, paste0("venn_contexts_", tolower(cohort), "_corrected"))
 
   gg <- draw_venn(snp_sets, CTX_FILL_COLORS[[cohort]], lbl)
   ctx_plots[[cohort]] <- gg
