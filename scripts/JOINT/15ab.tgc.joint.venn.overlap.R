@@ -383,10 +383,12 @@ get_sites <- function(dt, ctx) {
   unique(dt[context == ctx, site])
 }
 
-# Helper to extract unique SNPs for a given context from a results table
-get_snps <- function(dt, ctx) {
+# Position-based helper: avoids allele-ID inflation from multi-allelic sites.
+# Within a cohort the same tool's IDs are directly comparable, but using
+# chr:pos keeps units consistent with the main-panel Venns (sections 7-8).
+get_snp_pos <- function(dt, ctx) {
   if (!nrow(dt) || !"context" %in% names(dt)) return(character(0))
-  unique(dt[context == ctx, snp])
+  unique(dt[context == ctx, paste0(snp_chr, ":", snp_pos)])
 }
 
 for (cohort in COHORTS) {
@@ -395,9 +397,9 @@ for (cohort in COHORTS) {
     lbl <- SUPP_LABELS[[key]]
     log_msg("  Panel ", lbl, "  [", cohort, " / ", ctx, "]")
 
-    # Supplementary Venns compare tool agreement — unit: SNPs with significant cis-meQTL
-    g5_snps  <- get_snps(sig_raw[["GENESIS5"   ]][[cohort]], ctx)
-    me5_snps <- get_snps(sig_raw[["MATRIXEQTL5"]][[cohort]], ctx)
+    # Supplementary Venns compare tool agreement — unit: unique genomic positions (SNP chr:pos)
+    g5_snps  <- get_snp_pos(sig_raw[["GENESIS5"   ]][[cohort]], ctx)
+    me5_snps <- get_snp_pos(sig_raw[["MATRIXEQTL5"]][[cohort]], ctx)
 
     set_list <- list()
     if (length(g5_snps))  set_list[["GENESIS5"]]    <- g5_snps
@@ -413,8 +415,8 @@ for (cohort in COHORTS) {
 }
 
 ############################################################
-# 7) MAIN A — 3 Venns: BREEDING vs NATURAL per context (a)–c))
-#    Unit: methylation sites (robust markers only)
+# 7) MAIN A — 3 Venns: BREEDING vs NATURAL per context (c)–e))
+#    Unit: unique genomic positions (SNP chr:pos)
 ############################################################
 
 log_msg("--- Main A: cohort comparison by context (3 Venns) ---")
@@ -440,7 +442,7 @@ for (ctx in CONTEXTS) {
 
 ############################################################
 # 8) MAIN B — 2 Venns: CpG vs CHG vs CHH per cohort (a)–b))
-#    Unit: SNPs (robust markers only)
+#    Unit: unique genomic positions (SNP chr:pos)
 ############################################################
 
 log_msg("--- Main B: context comparison by cohort (2 Venns) ---")
@@ -449,10 +451,10 @@ for (cohort in COHORTS) {
   lbl <- COHORT_PANEL_LABELS[[cohort]]
   log_msg("  Panel ", lbl, "  [", cohort, "]")
 
-  # Compare robust SNP sets across the three cytosine contexts within each cohort
+  # Compare robust SNP positions across the three cytosine contexts within each cohort
   snp_sets <- list()
   for (ctx in CONTEXTS) {
-    snps <- robust_snps[[cohort]][[ctx]]
+    snps <- robust_snp_pos[[cohort]][[ctx]]
     if (length(snps)) snp_sets[[ctx]] <- snps
   }
 
@@ -515,13 +517,15 @@ for (cohort in COHORTS) {
     n_sites      <- if (is.data.table(rob) && nrow(rob) > 0) uniqueN(rob$site)  else 0L
     n_snps_pair  <- if (is.data.table(rob) && nrow(rob) > 0) uniqueN(rob$snp)   else 0L
     n_snps_snp   <- length(robust_snps[[cohort]][[ctx]])
+    n_pos        <- length(robust_snp_pos[[cohort]][[ctx]])
     rob_ctx_rows[[paste(cohort, ctx)]] <- data.table(
-      cohort                    = cohort,
-      context                   = ctx,
-      robust_pairs              = n_pairs,
-      robust_unique_sites       = n_sites,
+      cohort                       = cohort,
+      context                      = ctx,
+      robust_pairs                 = n_pairs,
+      robust_unique_sites          = n_sites,
       robust_unique_snps_pairlevel = n_snps_pair,
-      robust_unique_snps_snplevel  = n_snps_snp
+      robust_unique_snps_snplevel  = n_snps_snp,
+      robust_unique_positions      = n_pos
     )
   }
 }
