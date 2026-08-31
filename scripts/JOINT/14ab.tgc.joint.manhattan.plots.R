@@ -62,11 +62,12 @@ FDR_STRICT     <- 1e-10
 if (!exists("FDR_AXIS")) FDR_AXIS <- FALSE
 
 # v5 rendering settings
-OUT_W_CM      <- 18; OUT_H_CM <- 18; OUT_RES <- 600
-AXIS_GAP_FRAC <- 0.80    # wide gap for y-axis label
-TRACK_HEIGHT  <- 0.25
-POINT_PALETTE <- "Set1"
-CHR_LABEL_CEX <- 1.20
+OUT_W_CM          <- 18; OUT_H_CM <- 18; OUT_RES <- 600
+AXIS_GAP_FRAC     <- 0.80    # wide gap for y-axis label
+AXIS_SECTOR_SCALE <- 1.50    # sector 14 (axis_panel2) width multiplier vs v5
+TRACK_HEIGHT      <- 0.25
+POINT_PALETTE     <- "Set1"
+CHR_LABEL_CEX     <- 1.02    # 1.20 * 0.85 — reduced 15% to prevent "Un" clipping
 
 ############################################################
 # 2) PATHS  -- set PROJECT_ROOT and RDATA_DIR to your paths
@@ -174,7 +175,7 @@ prepare_layout <- function(contig_len_dt, chrom_map_df, gap_frac = AXIS_GAP_FRAC
   }, by = ChromN]
   clen <- dt[, .(chromN_len = sum(len)), by = ChromN]
   clen[, ChromN := factor(ChromN, levels = lvls)]; setorder(clen, ChromN)
-  gap_len <- max(clen$chromN_len) * gap_frac * 0.5
+  gap_len <- max(clen$chromN_len) * gap_frac * 0.5 * AXIS_SECTOR_SCALE
   idx_un  <- which(lvls == "ChrUn")
   if (length(idx_un)) {
     lvls_g <- append(lvls, "axis_panel2", after = idx_un)
@@ -398,7 +399,7 @@ draw_circular_manhattan <- function(dat, tool, cohort, out_path = NULL,
                   cex = CHR_LABEL_CEX, col = "black")
     })
 
-  yaxis_label <- if (FDR_AXIS) "-log10(FDR)" else "-log10(p)"
+  yaxis_label <- if (FDR_AXIS) expression(-log[10](FDR)) else expression(-log[10](p))
 
   # Explicit per-track calls (not a loop) to avoid R closure-in-loop issues.
   add_data_track <- function(dat_ctx, col_ctx, thr_logp, ylim_top) {
