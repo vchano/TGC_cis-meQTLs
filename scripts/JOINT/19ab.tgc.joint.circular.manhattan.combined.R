@@ -1,20 +1,29 @@
 #!/usr/bin/env Rscript
 ############################################################
-# TreeGeneClimate (TGC) — JOINT ECS + TMS
-# Step 19ab v2: Combined vectorized circular Manhattan panels
-#               Version 4 — 24cm canvas, wider tracks (TRACK_HEIGHT 0.25), tighter margins,
-#                            white bg, black labels. Ring fills more canvas without scaling elements.
+# TreeGeneClimate (TGC) — JOINT ECS + TBS
+# Step 19ab: Combined circular Manhattan panels
+#            Version 5 — 18 cm canvas, v5 rendering specs
 #
-# Reads *_4 individual TIFFs from 16ab4.R, assembles combined panels,
-# saves with "_4" suffix so prior outputs are not overwritten.
+# Produces 4 combined panels (each = BREEDING A + NATURAL B + legend):
+#   Fig. 3      : GENESIS5,    raw p-value axis   (_5)
+#   EDF4        : MatrixEQTL5, raw p-value axis   (_5)
+#   Fig. 3 FDR  : GENESIS5,    BH-FDR axis        (_5fdr)
+#   EDF4 FDR    : MatrixEQTL5, BH-FDR axis        (_5fdr)
 #
-# OUTPUTS (RESULTS/JOINT/COMBINED5/panels/)
-#   Figure6_circular_panel_genesis5_4.{pdf,svg,tiff,png,eps}
-#   SuppFig2_circular_panel_matrixeqtl5_4.{pdf,svg,tiff,png,eps}
+# Each panel saved as: tiff, pdf, svg, png, eps
+#   tiff -- assembled from individual per-cohort TIFFs via ImageMagick
+#   pdf  -- drawn directly via cairo_pdf (36 cm x 20 cm)
+#   svg  -- drawn directly via svg()
+#   png  -- derived from tiff via ImageMagick (150 dpi)
+#   eps  -- derived from tiff via ImageMagick (300 dpi)
 #
-# OUTPUTS (RESULTS/CORRECTED/FIGURES/NEW/)
-#   {fmt}_corrected_Figure6_GENESIS_Manhattan_panel_4.{fmt}
-#   {fmt}_corrected_FigureS2_MatrixEQTL_Manhattan_panel_4.{fmt}
+# OUTPUTS
+#   RESULTS/JOINT/COMBINED5/panels/
+#     Figure3_circular_panel_genesis5_5.{tiff,pdf,svg,png,eps}
+#     EDF4_circular_panel_matrixeqtl5_5.{tiff,pdf,svg,png,eps}
+#     Figure3_circular_panel_genesis5_5_FDR.{tiff,pdf,svg,png,eps}
+#     EDF4_circular_panel_matrixeqtl5_5_FDR.{tiff,pdf,svg,png,eps}
+#   RESULTS/CORRECTED/FIGURES/NEW/  (copies of all above)
 ############################################################
 
 suppressPackageStartupMessages({
@@ -29,17 +38,21 @@ suppressPackageStartupMessages({
 options(stringsAsFactors = FALSE)
 
 ############################################################
-# 1) SOURCE 16ab4.R (functions + updated settings; guard skips main loop)
+# 1) PATHS + SOURCE 16ab.tgc.joint.panel.assembly.R
+#    (functions + settings; guard skips main rendering loop)
 ############################################################
 
+PROJECT_ROOT  <- "/path/to/your/project"   # <-- set this (one place for both scripts)
 SOURCED_16AB4 <- TRUE
-source("/path/to/your/project/SCRIPTS/JOINT/16ab4.R")
+FDR_AXIS      <- FALSE   # default; overridden per panel below
+source(file.path(PROJECT_ROOT, "SCRIPTS", "JOINT",
+                 "16ab.tgc.joint.panel.assembly.R"))
 
 ############################################################
-# 2) PATHS
+# 2) PATHS (continued)
 ############################################################
 
-PROJECT_ROOT <- "/path/to/your/project"
+# PROJECT_ROOT already set above
 MAN_DIR      <- file.path(PROJECT_ROOT, "RESULTS", "JOINT", "COMBINED5", "manhattan")
 PANEL_DIR    <- file.path(PROJECT_ROOT, "RESULTS", "JOINT", "COMBINED5", "panels")
 NEW_DIR      <- file.path(PROJECT_ROOT, "RESULTS", "CORRECTED", "FIGURES", "NEW")
@@ -49,7 +62,7 @@ dir.create(NEW_DIR,   recursive = TRUE, showWarnings = FALSE)
 
 LOG_DIR <- file.path(PROJECT_ROOT, "RESULTS", "JOINT", "COMBINED5", "LOGS")
 dir.create(LOG_DIR, recursive = TRUE, showWarnings = FALSE)
-LOGFILE <- file.path(LOG_DIR, "step19ab_v4.log")
+LOGFILE <- file.path(LOG_DIR, "step19ab_combined.log")
 if (file.exists(LOGFILE)) file.remove(LOGFILE)
 
 log_msg <- function(...) {
@@ -75,20 +88,25 @@ sector_lens    <- layout_info$sector_lens
 log_msg("Sectors: ", paste(names(sector_lens), collapse = ", "))
 
 ############################################################
-# 4) COMBINED DEVICE DIMENSIONS  (uses OUT_W_CM = 24 from 16ab4.R, wider tracks)
+# 4) COMBINED DEVICE DIMENSIONS
 ############################################################
 
-PNL_W_CM  <- OUT_W_CM
-PNL_H_CM  <- OUT_H_CM
-LEG_H_CM  <- 3.5
-COMB_W_CM <- PNL_W_CM * 2
-COMB_H_CM <- PNL_H_CM + LEG_H_CM
+PNL_W_CM  <- OUT_W_CM          # 18 cm (from 16ab script)
+PNL_H_CM  <- OUT_H_CM          # 18 cm
+LEG_H_CM  <- 2.0               # reduced from 3.5 in v4
+COMB_W_CM <- PNL_W_CM * 2      # 36 cm
+COMB_H_CM <- PNL_H_CM + LEG_H_CM  # 20 cm
+
+ctx_colors_global <- setNames(
+  brewer.pal(max(3L, length(CTX_ORDER)), POINT_PALETTE)[seq_along(CTX_ORDER)],
+  CTX_ORDER
+)
 
 MAGICK_BIN <- Sys.which("magick")
 if (!nzchar(MAGICK_BIN)) MAGICK_BIN <- Sys.which("convert")
 HAS_MAGICK <- nzchar(MAGICK_BIN)
 if (HAS_MAGICK) log_msg("ImageMagick: ", MAGICK_BIN) else
-  log_msg("WARNING: ImageMagick not found — raster assembly skipped")
+  log_msg("WARNING: ImageMagick not found -- raster formats skipped")
 
 run_magick <- function(args_str) {
   cmd <- paste(shQuote(MAGICK_BIN), args_str)
@@ -96,18 +114,22 @@ run_magick <- function(args_str) {
   if (ret != 0L) stop("magick failed:\n  ", cmd)
 }
 
+check_nonempty <- function(path, min_bytes = 5000L) {
+  file.exists(path) && file.info(path)$size >= min_bytes
+}
+
 ############################################################
 # 5) DRAW-COMBINED FUNCTION
 ############################################################
 
-draw_combined_panel <- function(tool, out_base) {
+draw_combined_panel <- function(tool, out_base, fdr_mode) {
 
+  FDR_AXIS <<- fdr_mode   # set global for load_panel_data and draw_circular_manhattan
+  axis_tag  <- if (fdr_mode) "_5fdr" else "_5"
+
+  log_msg("  Loading data: ", tool, " BREEDING + NATURAL [FDR_AXIS=", fdr_mode, "]")
   dat_b <- load_panel_data(tool, "BREEDING")
   dat_n <- load_panel_data(tool, "NATURAL")
-  ctx_colors_global <- setNames(
-    brewer.pal(max(3L, length(CTX_ORDER)), POINT_PALETTE)[seq_along(CTX_ORDER)],
-    CTX_ORDER
-  )
 
   draw_both <- function(dev_open_fn) {
     dev_open_fn()
@@ -118,9 +140,9 @@ draw_combined_panel <- function(tool, out_base) {
            heights = lcm(c(PNL_H_CM, LEG_H_CM)))
 
     draw_circular_manhattan(dat_b, tool, "BREEDING",
-                            open_device = FALSE, label_cex = 3.15)
+                            open_device = FALSE, label_cex = 2.80)
     draw_circular_manhattan(dat_n, tool, "NATURAL",
-                            open_device = FALSE, label_cex = 3.15)
+                            open_device = FALSE, label_cex = 2.80)
 
     par(mar = c(0, 0, 0, 0))
     plot.new()
@@ -129,61 +151,77 @@ draw_combined_panel <- function(tool, out_base) {
            legend    = CTX_ORDER,
            pch       = 16,
            col       = ctx_colors_global,
-           pt.cex    = 3.0,
-           cex       = 2.0,
+           pt.cex    = 2.0,
+           cex       = 1.5,
            horiz     = TRUE,
            bty       = "n",
-           x.intersp = 1.5)
+           x.intersp = 1.2)
   }
 
-  # Vectorized PDF
+  # PDF (cairo_pdf -- vectorized)
   pdf_out <- paste0(out_base, ".pdf")
-  log_msg("  Drawing vectorized PDF: ", basename(pdf_out))
+  log_msg("  Drawing PDF: ", basename(pdf_out))
   tryCatch(
     draw_both(function()
       cairo_pdf(pdf_out, width = COMB_W_CM / 2.54, height = COMB_H_CM / 2.54)),
     error = function(e) log_msg("  ERROR (pdf): ", conditionMessage(e))
   )
-  log_msg("  Saved: ", pdf_out)
+  if (check_nonempty(pdf_out)) {
+    log_msg("  PDF OK (", file.info(pdf_out)$size, " bytes)")
+  } else {
+    log_msg("  WARNING: PDF may be empty -- check file size")
+  }
 
-  # Vectorized SVG
+  # SVG (vectorized)
   svg_out <- paste0(out_base, ".svg")
-  log_msg("  Drawing vectorized SVG: ", basename(svg_out))
+  log_msg("  Drawing SVG: ", basename(svg_out))
   tryCatch(
     draw_both(function()
       svg(svg_out, width = COMB_W_CM / 2.54, height = COMB_H_CM / 2.54)),
     error = function(e) log_msg("  ERROR (svg): ", conditionMessage(e))
   )
-  log_msg("  Saved: ", svg_out)
+  if (check_nonempty(svg_out)) {
+    log_msg("  SVG OK (", file.info(svg_out)$size, " bytes)")
+  } else {
+    log_msg("  WARNING: SVG may be empty")
+  }
 
-  # Raster assembly from _4 individual TIFFs
+  # TIFF (ImageMagick assembly from individual per-cohort TIFFs)
   if (HAS_MAGICK) {
-    tool_l   <- tolower(tool)
-    img_b    <- file.path(MAN_DIR, sprintf("manhattan_circular_%s_breeding_4.tiff", tool_l))
-    img_n    <- file.path(MAN_DIR, sprintf("manhattan_circular_%s_natural_4.tiff",  tool_l))
-    leg_tiff <- file.path(MAN_DIR, "legend_circular_4.tiff")
+    tool_l  <- tolower(tool)
+    img_b   <- file.path(MAN_DIR,
+                  sprintf("manhattan_circular_%s_breeding%s.tiff", tool_l, axis_tag))
+    img_n   <- file.path(MAN_DIR,
+                  sprintf("manhattan_circular_%s_natural%s.tiff",  tool_l, axis_tag))
+    leg_tif <- file.path(MAN_DIR, "legend_circular_5.tiff")
 
-    if (all(file.exists(img_b, img_n, leg_tiff))) {
-      TMP <- file.path(PANEL_DIR, ".tmp19v4")
+    if (all(file.exists(img_b, img_n, leg_tif))) {
+      TMP <- file.path(PANEL_DIR, ".tmp19combined")
       dir.create(TMP, recursive = TRUE, showWarnings = FALSE)
 
-      panel_tmp <- file.path(TMP, sprintf("%s_circs_4.tiff", tool_l))
+      pair_tmp <- file.path(TMP, sprintf("%s%s_circs.tiff", tool_l, axis_tag))
       run_magick(paste(shQuote(img_b), shQuote(img_n),
-                       "+append -compress lzw", shQuote(panel_tmp)))
+                       "+append -compress lzw", shQuote(pair_tmp)))
 
       tiff_out <- paste0(out_base, ".tiff")
-      run_magick(paste(shQuote(panel_tmp), shQuote(leg_tiff),
+      run_magick(paste(shQuote(pair_tmp), shQuote(leg_tif),
                        "-append -compress lzw", shQuote(tiff_out)))
-      log_msg("  Saved: ", tiff_out)
+      log_msg("  TIFF assembled: ", file.info(tiff_out)$size, " bytes")
 
-      for (fmt in c("png", "eps")) {
-        out_fmt <- paste0(out_base, ".", fmt)
-        run_magick(paste("-density 300", shQuote(tiff_out), shQuote(out_fmt)))
-        log_msg("  Saved: ", out_fmt)
-      }
+      png_out <- paste0(out_base, ".png")
+      run_magick(paste("-density 150", shQuote(tiff_out), shQuote(png_out)))
+      log_msg("  PNG: ", basename(png_out))
+
+      eps_out <- paste0(out_base, ".eps")
+      run_magick(paste("-density 300", shQuote(tiff_out), shQuote(eps_out)))
+      log_msg("  EPS: ", basename(eps_out))
+
       unlink(TMP, recursive = TRUE)
     } else {
-      log_msg("  WARNING: pre-generated _4 TIFFs missing — raster formats skipped")
+      log_msg("  WARNING: individual TIFFs missing -- TIFF/PNG/EPS skipped")
+      log_msg("    Breeding: ", img_b)
+      log_msg("    Natural:  ", img_n)
+      log_msg("    Legend:   ", leg_tif)
     }
   }
 
@@ -191,57 +229,53 @@ draw_combined_panel <- function(tool, out_base) {
 }
 
 ############################################################
-# 6) RUN FOR EACH TOOL
+# 6) RUN -- 2 tools x 2 axis modes = 4 panels
 ############################################################
 
 figure_specs <- list(
-  GENESIS5    = list(out_stem = "Figure6_circular_panel_genesis5_4"),
-  MATRIXEQTL5 = list(out_stem = "SuppFig2_circular_panel_matrixeqtl5_4")
+  list(tool = "GENESIS5",    fdr = FALSE,
+       stem = "Figure3_circular_panel_genesis5_5"),
+  list(tool = "MATRIXEQTL5", fdr = FALSE,
+       stem = "EDF4_circular_panel_matrixeqtl5_5"),
+  list(tool = "GENESIS5",    fdr = TRUE,
+       stem = "Figure3_circular_panel_genesis5_5_FDR"),
+  list(tool = "MATRIXEQTL5", fdr = TRUE,
+       stem = "EDF4_circular_panel_matrixeqtl5_5_FDR")
 )
 
-for (tool in names(figure_specs)) {
-  log_msg("=== ", tool, " ===")
-  spec     <- figure_specs[[tool]]
-  out_base <- file.path(PANEL_DIR, spec$out_stem)
-  draw_combined_panel(tool, out_base)
+for (spec in figure_specs) {
+  log_msg(paste(rep("=", 65), collapse = ""))
+  log_msg("Panel: ", spec$stem)
+  out_base <- file.path(PANEL_DIR, spec$stem)
+  draw_combined_panel(spec$tool, out_base, spec$fdr)
 }
 
 ############################################################
-# 7) COPY TO CORRECTED/FIGURES/NEW WITH "_4" SUFFIX
+# 7) COPY ALL FORMATS TO CORRECTED/FIGURES/NEW
 ############################################################
 
-log_msg("Copying to CORRECTED/FIGURES/NEW/...")
+log_msg(paste(rep("=", 65), collapse = ""))
+log_msg("Copying to CORRECTED/FIGURES/NEW...")
 
-copy_formats <- c("pdf", "svg", "tiff", "png", "eps")
+copy_fmts <- c("tiff", "pdf", "svg", "png", "eps")
 
-copies <- list(
-  list(
-    stem = file.path(PANEL_DIR, "Figure6_circular_panel_genesis5_4"),
-    dest = "corrected_Figure6_GENESIS_Manhattan_panel_4"
-  ),
-  list(
-    stem = file.path(PANEL_DIR, "SuppFig2_circular_panel_matrixeqtl5_4"),
-    dest = "corrected_FigureS2_MatrixEQTL_Manhattan_panel_4"
-  )
-)
-
-for (cp in copies) {
-  for (fmt in copy_formats) {
-    src <- paste0(cp$stem, ".", fmt)
-    dst <- file.path(NEW_DIR, paste0(fmt, "_", cp$dest, ".", fmt))
-    if (file.exists(src)) {
+for (spec in figure_specs) {
+  for (fmt in copy_fmts) {
+    src <- file.path(PANEL_DIR, paste0(spec$stem, ".", fmt))
+    dst <- file.path(NEW_DIR,   paste0(fmt, "_", spec$stem, ".", fmt))
+    if (file.exists(src) && file.info(src)$size > 0) {
       file.copy(src, dst, overwrite = TRUE)
       log_msg("  ", basename(dst))
     } else {
-      log_msg("  MISSING (skip): ", basename(src))
+      log_msg("  MISSING/EMPTY (skip): ", basename(src))
     }
   }
 }
 
-############################################################
-# 8) DONE
-############################################################
+writeLines(capture.output(sessionInfo()),
+           file.path(LOG_DIR, "step19ab_combined_sessionInfo.txt"))
 
-log_msg("Step 19ab v2 finished")
-log_msg("Outputs in: ", PANEL_DIR)
-log_msg("Corrected copies in: ", NEW_DIR)
+log_msg(paste(rep("=", 65), collapse = ""))
+log_msg("Step 19ab combined finished")
+log_msg("Panels in: ", PANEL_DIR)
+log_msg("Copies in: ", NEW_DIR)
