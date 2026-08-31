@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 ############################################################
 # TreeGeneClimate (TGC) — JOINT ECS + TMS
-# Step 20ab: Compile summary tables for manuscript
+# Step 18ab: Compile summary tables for manuscript
 #
 # OUTPUTS (RESULTS/JOINT/COMBINED5/tables/)
 #   table_ecs_summary.tsv / .md   — ECS genotyping table
@@ -418,7 +418,180 @@ if (!file.exists(DRAFT_MD)) {
   }
 }
 
-msg("Step 20ab finished.")
+msg("Step 18ab finished.")
 msg("  Outputs in: ", OUT_DIR)
+
+############################################################
+# SECTION 5) FIX SUPPLEMENTARY TABLE 1 — S2 CORRECTIONS
+#
+#   (a) Row 6 label: update to "[n = 602]" (602-sample trimmed read stats)
+#   (b) Row 6 value: mean (range) of trimmed reads from ecs_read_counts.tsv
+#   (c) Rows 9-13 values: correct thousands-separator corruption
+#       (488.826 → 488826, etc.)
+#
+# Input:  _corrected_s8.xlsx   (output of Step 17ab Section 10)
+# Output: _corrected_s8_s2.xlsx
+############################################################
+
+suppressPackageStartupMessages(library(openxlsx2))
+
+msg("======================================================")
+msg("Section 5: Supplementary Table 1 — S2 corrections")
+msg("======================================================")
+
+NATGEN_DIR  <- file.path(PROJECT_ROOT, "RESULTS/DRAFT/NATURE.GENETICS")
+S1_XLSX_IN  <- file.path(NATGEN_DIR,
+  "260819_Chano.etal.2026_tgc_supp.tables_corrected_s8.xlsx")
+S1_XLSX_S2  <- file.path(NATGEN_DIR,
+  "260819_Chano.etal.2026_tgc_supp.tables_corrected_s8_s2.xlsx")
+S1_TSV      <- file.path(PROJECT_ROOT,
+  "RESULTS/JOINT/COMBINED5/tables/ecs_read_counts.tsv")
+S1_SHEET    <- "Supplementary Table 1"
+
+if (!file.exists(S1_XLSX_IN)) {
+  msg("WARNING: corrected_s8.xlsx not found -- skipping S1 S2 fix: ", S1_XLSX_IN)
+} else if (!file.exists(S1_TSV)) {
+  msg("WARNING: ecs_read_counts.tsv not found -- skipping S1 S2 fix: ", S1_TSV)
+} else {
+
+  msg("Reading read count TSV: ", basename(S1_TSV))
+  rc       <- fread(S1_TSV, sep = "\t")
+  rc_study <- rc[substr(sample, 1, 1) == "P"]
+  msg("  Study samples: ", nrow(rc_study))
+  stopifnot(nrow(rc_study) == 602)
+
+  tr     <- rc_study$trimmed_reads
+  mn_tr  <- mean(tr, na.rm = TRUE)
+  min_tr <- min(tr, na.rm = TRUE)
+  max_tr <- max(tr, na.rm = TRUE)
+  fmt_M  <- function(x) sprintf("%.1f", x / 1e6)
+  trimmed_val <- sprintf("%s (%s–%s)",
+                         fmt_M(mn_tr), fmt_M(min_tr), fmt_M(max_tr))
+  msg("  Formatted trimmed reads: ", trimmed_val)
+
+  snp_vals <- list(row9=488826L, row10=450947L, row11=462617L,
+                   row12=120923L, row13=132708L)
+
+  write_cell <- function(wb, sheet, row, col, val) {
+    wb_add_data(wb, sheet = sheet, x = val,
+                start_row = row, start_col = col, col_names = FALSE)
+  }
+
+  msg("Loading workbook: ", basename(S1_XLSX_IN))
+  wb1 <- wb_load(S1_XLSX_IN)
+
+  wb1 <- write_cell(wb1, S1_SHEET, 6, 1,
+                    "Mean trimmed reads per sample, M (range) [n = 602]")
+  wb1 <- write_cell(wb1, S1_SHEET, 6, 2, trimmed_val)
+
+  for (nm in names(snp_vals)) {
+    rnum <- as.integer(sub("row", "", nm))
+    msg("  Row ", rnum, " SNP count -> ", snp_vals[[nm]])
+    wb1 <- write_cell(wb1, S1_SHEET, rnum, 2, snp_vals[[nm]])
+  }
+
+  msg("Saving: ", basename(S1_XLSX_S2))
+  wb_save(wb1, S1_XLSX_S2)
+  msg("Saved: ", S1_XLSX_S2)
+}
+
+############################################################
+# SECTION 6) FIX SUPPLEMENTARY TABLE 1 — TMS ADDITIONS
+#
+#   (a) Row 5 label: clarify raw ECS reads are n=18 only
+#   (b) New TMS section at rows 17-19 (trimmed pairs, mapping efficiency)
+#   (c) Updated abbreviation note at row 21
+#
+# Input:  _corrected_s8_s2.xlsx   (output of Section 5 above)
+# Output: _corrected_s8_s2_tms.xlsx
+############################################################
+
+msg("======================================================")
+msg("Section 6: Supplementary Table 1 — TMS additions")
+msg("======================================================")
+
+S1_XLSX_TMS <- file.path(NATGEN_DIR,
+  "260819_Chano.etal.2026_tgc_supp.tables_corrected_s8_s2_tms.xlsx")
+TBS_MAP     <- file.path(PROJECT_ROOT, "DATA/TMS/MAPPED.FILES.TMS")
+
+if (!file.exists(S1_XLSX_S2)) {
+  msg("WARNING: corrected_s8_s2.xlsx not found -- skipping TMS section: ", S1_XLSX_S2)
+} else if (!dir.exists(TBS_MAP)) {
+  msg("WARNING: TMS map dir not found -- skipping TMS section: ", TBS_MAP)
+} else {
+
+  msg("Finding Bismark PE reports in: ", TBS_MAP)
+  report_files <- list.files(TBS_MAP, pattern = "bismark_bt2_PE_report\\.txt$",
+                              recursive = TRUE, full.names = TRUE)
+  msg("  Found: ", length(report_files), " reports")
+
+  parse_bismark_report <- function(f) {
+    lines  <- readLines(f, warn = FALSE)
+    sname  <- sub("_R1_p_bismark_bt2_PE_report\\.txt$", "", basename(f))
+    pl     <- grep("Sequence pairs analysed in total", lines, value = TRUE)
+    pairs  <- if (length(pl)) as.integer(trimws(sub(".*:\t", "", pl[1]))) else NA_integer_
+    el     <- grep("Mapping efficiency:", lines, value = TRUE)
+    eff    <- if (length(el))
+      as.numeric(sub("%.*", "", trimws(sub("Mapping efficiency:\t", "", el[1])))) else NA_real_
+    data.table(sample = sname, tbs_pairs = pairs, tbs_map_pct = eff)
+  }
+
+  if (file.exists(S1_TSV)) {
+    rc2          <- fread(S1_TSV, sep = "\t")
+    ecs_samps    <- rc2[substr(sample, 1, 1) == "P", sample]
+  } else {
+    ecs_samps <- character(0)
+  }
+
+  tms_dt    <- rbindlist(lapply(report_files, parse_bismark_report))
+  tms_study <- if (length(ecs_samps)) tms_dt[sample %in% ecs_samps] else tms_dt
+  n_tms     <- nrow(tms_study)
+  msg("  Matched study samples: ", n_tms)
+
+  fmt_M  <- function(x) sprintf("%.1f", x / 1e6)
+  tr2    <- tms_study$tbs_pairs
+  tms_pairs_val <- sprintf("%s (%s–%s)",
+                           fmt_M(mean(tr2, na.rm=TRUE)),
+                           fmt_M(min(tr2,  na.rm=TRUE)),
+                           fmt_M(max(tr2,  na.rm=TRUE)))
+  me     <- tms_study$tbs_map_pct
+  tms_map_val <- sprintf("%.1f (%.1f–%.1f)",
+                         mean(me, na.rm=TRUE), min(me, na.rm=TRUE), max(me, na.rm=TRUE))
+  msg("  TMS pairs: ", tms_pairs_val)
+  msg("  TMS mapping: ", tms_map_val)
+
+  write_cell2 <- function(wb, sheet, row, col, val) {
+    wb_add_data(wb, sheet = sheet, x = val,
+                start_row = row, start_col = col, col_names = FALSE)
+  }
+
+  msg("Loading workbook: ", basename(S1_XLSX_S2))
+  wb2 <- wb_load(S1_XLSX_S2)
+
+  wb2 <- write_cell2(wb2, S1_SHEET, 5, 1,
+    "Mean raw reads per sample (range) [n = 18; raw data not retained after processing for remaining samples]")
+
+  wb2 <- write_cell2(wb2, S1_SHEET, 17, 1,
+    "Targeted methylation sequencing (TMS) data processing summary")
+  wb2 <- write_cell2(wb2, S1_SHEET, 17, 2, "")
+
+  wb2 <- write_cell2(wb2, S1_SHEET, 18, 1,
+    sprintf("Mean trimmed read pairs per sample, M (range) [n = %d]", n_tms))
+  wb2 <- write_cell2(wb2, S1_SHEET, 18, 2, tms_pairs_val)
+
+  wb2 <- write_cell2(wb2, S1_SHEET, 19, 1,
+    sprintf("Mean Bismark PE mapping efficiency, %% (range) [n = %d]", n_tms))
+  wb2 <- write_cell2(wb2, S1_SHEET, 19, 2, tms_map_val)
+
+  wb2 <- write_cell2(wb2, S1_SHEET, 21, 1,
+    paste0("SNP: single nucleotide polymorphism; MAF: minimum allele frequency; ",
+           "LD: linkage disequilibrium; M: millions of reads; ",
+           "TMS: targeted methylation sequencing; PE: paired-end; ",
+           "Bismark: bisulfite aligner v0.23.0"))
+
+  msg("Saving: ", basename(S1_XLSX_TMS))
+  wb_save(wb2, S1_XLSX_TMS)
+  msg("Saved: ", S1_XLSX_TMS)
+}
 
 sessionInfo()

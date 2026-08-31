@@ -1072,4 +1072,235 @@ msg("======================================================")
 msg("Step 17ab finished. Outputs: ", OUT_ROOT)
 msg("======================================================")
 
+############################################################
+# SECTION 10) SUPPLEMENTARY TABLE 6 — FILL MISSING REF/ALT/AF
+#
+# Strategy:
+#   1. Read Supplementary Table 6 xlsx (headers on row 3)
+#   2. Collect unique (chr, pos, cohort) where ref is NA
+#   3. Query per-cohort imputed VCF (has AF in INFO)
+#   4. Fallback to raw per-cohort VCF (no AF)
+#   5. Fallback to unfiltered all-samples VCF with bcftools fill-tags
+#      (for positions filtered out of per-cohort VCFs due to MAF < 0.05)
+#   6. Write corrected xlsx preserving all other sheets and formatting
+#
+# NOTE: CSI indexing is required for large Norway spruce chromosomes (>512 Mb)
+############################################################
+
+suppressPackageStartupMessages(library(openxlsx2))
+
+msg("======================================================")
+msg("Section 10: Supplementary Table 6 — fill missing ref/alt/af")
+msg("======================================================")
+
+NATGEN_DIR <- file.path(PROJECT_ROOT, "RESULTS/DRAFT/NATURE.GENETICS")
+
+XLSX_S6_IN  <- file.path(NATGEN_DIR,
+  "260819_Chano.etal.2026_tgc_supp.tables.xlsx")
+XLSX_S6_OUT <- file.path(NATGEN_DIR,
+  "260819_Chano.etal.2026_tgc_supp.tables_corrected_s8.xlsx")
+
+VCF_S6 <- list(
+  BREEDING = list(
+    imputed = file.path(PROJECT_ROOT,
+      "RESULTS/ECS/VCF_SPLIT/tgc.ecs.breeding.call.filt.maf05.snvs.poly.imputed.vcf.gz"),
+    raw     = file.path(PROJECT_ROOT,
+      "RESULTS/ECS/VCF_SPLIT/tgc.ecs.breeding.call.filt.maf05.snvs.poly.vcf.gz")
+  ),
+  NATURAL = list(
+    imputed = file.path(PROJECT_ROOT,
+      "RESULTS/ECS/VCF_SPLIT/tgc.ecs.natural.call.filt.maf05.snvs.poly.imputed.vcf.gz"),
+    raw     = file.path(PROJECT_ROOT,
+      "RESULTS/ECS/VCF_SPLIT/tgc.ecs.natural.call.filt.maf05.snvs.poly.vcf.gz")
+  )
+)
+VCF_UNFILT  <- file.path(PROJECT_ROOT,
+  "RESULTS/ECS/VARIANT.CALLING/tgc.ecs.allsamples.call.unfilt.snvs.renamed.vcf.gz")
+SAMPS_B     <- file.path(PROJECT_ROOT,
+  "RESULTS/ECS/VARIANT.CALLING2/SPLIT/all_breeding_samples.txt")
+SAMPS_N     <- file.path(PROJECT_ROOT,
+  "RESULTS/ECS/VARIANT.CALLING2/SPLIT/all_natural_samples.txt")
+COHORT_SAMPS_S6 <- list(BREEDING = SAMPS_B, NATURAL = SAMPS_N)
+
+TMP_S6 <- file.path(PROJECT_ROOT, "RESULTS/JOINT/COMBINED5/tmp_s8fix")
+dir.create(TMP_S6, recursive = TRUE, showWarnings = FALSE)
+
+BCFTOOLS_S6 <- Sys.which("bcftools")
+if (!nzchar(BCFTOOLS_S6)) {
+  msg("WARNING: bcftools not found — skipping Section 10 (load module bcftools)")
+} else if (!file.exists(XLSX_S6_IN)) {
+  msg("WARNING: Supplementary Table xlsx not found: ", XLSX_S6_IN)
+} else {
+
+  msg("bcftools: ", BCFTOOLS_S6)
+  msg("Checking/creating CSI indices...")
+  for (coh in names(VCF_S6)) {
+    for (tp in names(VCF_S6[[coh]])) {
+      vcf <- VCF_S6[[coh]][[tp]]
+      csi <- paste0(vcf, ".csi")
+      if (file.exists(vcf) && !file.exists(csi)) {
+        msg("  Indexing (", coh, " ", tp, "): ", basename(vcf))
+        system(paste(shQuote(BCFTOOLS_S6), "index -c", shQuote(vcf)))
+      }
+    }
+  }
+
+  msg("Reading Supplementary Table 6...")
+  st6 <- as.data.table(read_xlsx(XLSX_S6_IN, sheet = "Supplementary Table 6",
+                                  start_row = 3))
+  st6 <- st6[, names(st6)[!is.na(names(st6)) & names(st6) != "NA_"], with = FALSE]
+  st6[, .row_idx := .I]
+  st6[, pos := as.integer(pos)]
+  COL_REF <- which(names(st6) == "ref")
+  COL_ALT <- which(names(st6) == "alt")
+  COL_AF  <- which(names(st6) == "af")
+  msg("  Rows: ", nrow(st6), " | NA ref: ", sum(is.na(st6$ref)))
+
+  # Query a VCF that already has AF in INFO (imputed)
+  query_vcf_s6 <- function(markers_dt, vcf_file, tmp_prefix, has_af = TRUE) {
+    empty <- data.table(chr = character(), pos = integer(),
+                        ref = character(), alt = character(), af = numeric())
+    if (!file.exists(vcf_file)) return(empty)
+    markers_dt <- unique(markers_dt[!is.na(chr) & !is.na(pos), .(chr, pos)])
+    if (!nrow(markers_dt)) return(empty)
+    reg_file <- paste0(tmp_prefix, ".bed")
+    fwrite(markers_dt[, .(chr, start = pos - 1L, end = pos)],
+           reg_file, sep = "\t", col.names = FALSE)
+    out_file <- paste0(tmp_prefix, ".tsv")
+    fmt <- if (has_af) "'%CHROM\\t%POS\\t%REF\\t%ALT\\t%INFO/AF\\n'"
+           else        "'%CHROM\\t%POS\\t%REF\\t%ALT\\t.\\n'"
+    system(sprintf("%s query -R %s -f %s %s > %s 2>/dev/null",
+                   shQuote(BCFTOOLS_S6), shQuote(reg_file), fmt,
+                   shQuote(vcf_file), shQuote(out_file)))
+    file.remove(reg_file)
+    if (!file.exists(out_file) || file.info(out_file)$size == 0) return(empty)
+    res <- fread(out_file, header = FALSE, sep = "\t", fill = TRUE,
+                 col.names = c("chr","pos","ref","alt","af"), na.strings = ".")
+    file.remove(out_file)
+    res[, pos := as.integer(pos)]; res[, af := suppressWarnings(as.numeric(af))]
+    unique(res, by = c("chr","pos"))
+  }
+
+  # Query the unfiltered all-samples VCF, computing AF per cohort via fill-tags
+  query_vcf_unfilt_s6 <- function(markers_dt, cohort, tmp_prefix) {
+    empty <- data.table(chr = character(), pos = integer(),
+                        ref = character(), alt = character(), af = numeric())
+    if (!file.exists(VCF_UNFILT)) return(empty)
+    samps_file <- COHORT_SAMPS_S6[[cohort]]
+    if (!file.exists(samps_file)) return(empty)
+    markers_dt <- unique(markers_dt[!is.na(chr) & !is.na(pos), .(chr, pos)])
+    if (!nrow(markers_dt)) return(empty)
+    reg_file <- paste0(tmp_prefix, "_unfilt.bed")
+    fwrite(markers_dt[, .(chr, start = pos - 1L, end = pos)],
+           reg_file, sep = "\t", col.names = FALSE)
+    out_file <- paste0(tmp_prefix, "_unfilt.tsv")
+    cmd <- sprintf(
+      "%s view --samples-file %s -R %s %s | %s plugin fill-tags -- -t AF | %s query -f '%%CHROM\\t%%POS\\t%%REF\\t%%ALT\\t%%INFO/AF\\n' > %s 2>/dev/null",
+      shQuote(BCFTOOLS_S6), shQuote(samps_file), shQuote(reg_file),
+      shQuote(VCF_UNFILT),
+      shQuote(BCFTOOLS_S6), shQuote(BCFTOOLS_S6),
+      shQuote(out_file)
+    )
+    system(cmd); file.remove(reg_file)
+    if (!file.exists(out_file) || file.info(out_file)$size == 0) return(empty)
+    res <- fread(out_file, header = FALSE, sep = "\t", fill = TRUE,
+                 col.names = c("chr","pos","ref","alt","af"), na.strings = ".")
+    file.remove(out_file)
+    res[, pos := as.integer(pos)]; res[, af := suppressWarnings(as.numeric(af))]
+    unique(res, by = c("chr","pos"))
+  }
+
+  fill_cohort_s6 <- function(sub, cohort) {
+    missing <- unique(sub[is.na(ref), .(chr, pos)])
+    if (!nrow(missing)) { msg("  No missing in ", cohort); return(sub) }
+    msg("  ", cohort, ": ", nrow(missing), " chr:pos to fill")
+
+    # 1. Imputed VCF
+    vi <- query_vcf_s6(missing, VCF_S6[[cohort]]$imputed,
+                       file.path(TMP_S6, paste0(tolower(cohort), "_imp")), TRUE)
+    msg("  Imputed: ", nrow(vi), " hits")
+    if (nrow(vi)) {
+      sub <- merge(sub, vi[, .(chr, pos, ref_q=ref, alt_q=alt, af_q=af)],
+                   by=c("chr","pos"), all.x=TRUE, sort=FALSE)
+      sub[is.na(ref) & !is.na(ref_q), `:=`(ref=ref_q, alt=alt_q)]
+      sub[is.na(af)  & !is.na(af_q),  af := af_q]
+      sub[, c("ref_q","alt_q","af_q") := NULL]
+    }
+
+    # 2. Raw per-cohort VCF
+    still <- unique(sub[is.na(ref), .(chr, pos)])
+    if (nrow(still)) {
+      msg("  Still missing: ", nrow(still), " — trying raw VCF")
+      vr <- query_vcf_s6(still, VCF_S6[[cohort]]$raw,
+                         file.path(TMP_S6, paste0(tolower(cohort), "_raw")), FALSE)
+      msg("  Raw: ", nrow(vr), " hits")
+      if (nrow(vr)) {
+        sub <- merge(sub, vr[, .(chr, pos, ref_q=ref, alt_q=alt)],
+                     by=c("chr","pos"), all.x=TRUE, sort=FALSE)
+        sub[is.na(ref) & !is.na(ref_q), `:=`(ref=ref_q, alt=alt_q)]
+        sub[, c("ref_q","alt_q") := NULL]
+      }
+    }
+
+    # 3. Unfiltered all-samples VCF with fill-tags (MAF-filtered-out positions)
+    still2 <- unique(sub[is.na(ref), .(chr, pos)])
+    if (nrow(still2)) {
+      msg("  Still missing: ", nrow(still2), " — trying unfiltered VCF (", cohort, " fill-tags)")
+      vu <- query_vcf_unfilt_s6(still2, cohort,
+                                file.path(TMP_S6, paste0(tolower(cohort), "_unfilt")))
+      msg("  Unfiltered: ", nrow(vu), " hits")
+      if (nrow(vu)) {
+        sub <- merge(sub, vu[, .(chr, pos, ref_q=ref, alt_q=alt, af_q=af)],
+                     by=c("chr","pos"), all.x=TRUE, sort=FALSE)
+        sub[is.na(ref) & !is.na(ref_q), `:=`(ref=ref_q, alt=alt_q)]
+        sub[is.na(af)  & !is.na(af_q),  af := af_q]
+        sub[, c("ref_q","alt_q","af_q") := NULL]
+      }
+    }
+
+    msg("  After fill — NA ref: ", sum(is.na(sub$ref)))
+    sub
+  }
+
+  st6_b  <- fill_cohort_s6(st6[cohort == "BREEDING"], "BREEDING")
+  st6_n  <- fill_cohort_s6(st6[cohort == "NATURAL"],  "NATURAL")
+  st6_o  <- st6[!cohort %in% c("BREEDING","NATURAL")]
+  st6_fx <- rbind(st6_b, st6_n, st6_o, fill = TRUE)
+  setorder(st6_fx, .row_idx); st6_fx[, .row_idx := NULL]
+
+  msg("Summary — NA ref: ", sum(is.na(st6_fx$ref)),
+      " | NA alt: ", sum(is.na(st6_fx$alt)),
+      " | NA af: ", sum(is.na(st6_fx$af)))
+
+  # Write corrected xlsx (preserve all other sheets/formatting)
+  msg("Loading original workbook...")
+  wb_s6 <- wb_load(XLSX_S6_IN)
+  XLSX_DATA_START <- 4L
+  wb_s6 <- wb_add_data(wb_s6, sheet = "Supplementary Table 6",
+                        x = data.frame(ref = st6_fx$ref),
+                        start_row = XLSX_DATA_START, start_col = COL_REF,
+                        col_names = FALSE)
+  wb_s6 <- wb_add_data(wb_s6, sheet = "Supplementary Table 6",
+                        x = data.frame(alt = st6_fx$alt),
+                        start_row = XLSX_DATA_START, start_col = COL_ALT,
+                        col_names = FALSE)
+  wb_s6 <- wb_add_data(wb_s6, sheet = "Supplementary Table 6",
+                        x = data.frame(af = st6_fx$af),
+                        start_row = XLSX_DATA_START, start_col = COL_AF,
+                        col_names = FALSE)
+  msg("Saving: ", basename(XLSX_S6_OUT))
+  wb_save(wb_s6, XLSX_S6_OUT)
+  msg("Saved: ", XLSX_S6_OUT)
+
+  # Save corrected TSVs
+  ANN17 <- file.path(PROJECT_ROOT, "RESULTS/JOINT/ANNOTATION17")
+  fwrite(st6_fx[cohort == "BREEDING"],
+         file.path(ANN17, "robust_breeding_snps_annotated_corrected.tsv"), sep="\t")
+  fwrite(st6_fx[cohort == "NATURAL"],
+         file.path(ANN17, "robust_natural_snps_annotated_corrected.tsv"),  sep="\t")
+  msg("Corrected TSVs saved to ", ANN17)
+
+  unlink(TMP_S6, recursive = TRUE)
+}
+
 sessionInfo()

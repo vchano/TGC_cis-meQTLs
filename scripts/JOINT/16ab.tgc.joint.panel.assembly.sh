@@ -10,9 +10,9 @@
 #   3. Step 12ab2.R  — GENESIS5 cis-meQTL mapping (same panel)
 #   4. Step 13ab.R  — combined results, lambda table, QQ plots
 #                      run once after all 6 tasks finish
-#   5. Step 14ab.R  — circular Manhattan plots (both tools)
+#   5. Step 14ab.tgc.joint.manhattan.plots.R   — circular Manhattan plots
 #                      run once after step 13ab completes
-#   6. Step 16ab.R  — QQ + circular panel assembly (Figure 5, SuppFig 2-4)
+#   6. Step 16ab.tgc.joint.panel.assembly.R    — multi-panel figure assembly
 #                      run once after step 14ab completes
 #
 # JOB ARRAY MAP (6 tasks: 2 cohorts x 3 contexts):
@@ -187,7 +187,7 @@ touch "${G5_SUMDIR}/.done_${panel_tag}"
 echo "Task ${task}: Mapping complete for ${cohort}/${ctx} — $(date)"
 
 # ---------------------------------------------------------------------------
-# STEP 4 & 5 — Post-processing (13ab.R + 14ab.R)
+# STEP 4 & 5 — Post-processing (13ab.R + 14ab.tgc.joint.manhattan.plots.R)
 # The last task to finish all 6 panels runs post-processing.
 # ---------------------------------------------------------------------------
 MERGE_LOCK="${G5_SUMDIR}/.merge_lock"
@@ -206,13 +206,13 @@ MERGE_LOCK="${G5_SUMDIR}/.merge_lock"
     Rscript --vanilla "${SCRIPTS}/13ab.R"
     echo "13ab.R done — $(date)"
 
-    echo "Running 14ab.R (circular Manhattan plots)..."
-    Rscript --vanilla "${SCRIPTS}/14ab.R"
-    echo "14ab.R done — $(date)"
+    echo "Running 14ab.tgc.joint.manhattan.plots.R (circular Manhattan plots)..."
+    Rscript --vanilla "${SCRIPTS}/14ab.tgc.joint.manhattan.plots.R"
+    echo "14ab done — $(date)"
 
-    echo "Running 16ab.R (QQ + circular panel assembly)..."
-    Rscript --vanilla "${SCRIPTS}/16ab.R"
-    echo "16ab.R done — $(date)"
+    echo "Running 16ab.tgc.joint.panel.assembly.R (multi-panel figure assembly)..."
+    Rscript --vanilla "${SCRIPTS}/16ab.tgc.joint.panel.assembly.R"
+    echo "16ab done — $(date)"
 
     echo "Post-processing complete: $(date)"
   else
