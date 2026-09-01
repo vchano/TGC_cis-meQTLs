@@ -364,17 +364,18 @@ draw_circular_manhattan <- function(dat, tool, cohort, out_path = NULL,
     panel.fun = function(x, y) {
       sn <- CELL_META$sector.index
       if (sn == "axis_panel2") return(invisible())
-      lbl <- if (sn == "ChrUn") "Un" else sn
+      lbl     <- if (sn == "ChrUn") "Un" else sn
+      cex_lbl <- if (sn == "ChrUn") CHR_LABEL_CEX * 0.9 else CHR_LABEL_CEX
       circos.text(CELL_META$xcenter, 0.5, lbl,
                   facing = "bending.inside", niceFacing = TRUE,
-                  cex = CHR_LABEL_CEX, col = "black")
+                  cex = cex_lbl, col = "black")
     })
 
   # Y-axis label: conditionally FDR or p
   yaxis_label <- if (FDR_AXIS) expression(-log[10](FDR)) else expression(-log[10](p))
 
   add_data_track <- function(dat_ctx, col_ctx, thr_logp, ylim_top,
-                             tick_cex = 0.55, ylab_cex = 0.65) {
+                             tick_cex = 0.495, ylab_cex = 0.65) {
     circos.track(ylim = c(0, ylim_top), track.height = TRACK_HEIGHT,
                  bg.border = "grey55", bg.col = "white",
       panel.fun = function(x, y) {
@@ -427,7 +428,7 @@ draw_circular_manhattan <- function(dat, tool, cohort, out_path = NULL,
   add_data_track(panel_data[["CpG"]], ctx_colors[["CpG"]], threshold_logp[["CpG"]], ymax_cpg * 1.05)
   add_data_track(panel_data[["CHG"]], ctx_colors[["CHG"]], threshold_logp[["CHG"]], ymax_chg * 1.05)
   add_data_track(panel_data[["CHH"]], ctx_colors[["CHH"]], threshold_logp[["CHH"]], ymax_chh * 1.05,
-                 tick_cex = 0.5225, ylab_cex = 0.6175)
+                 tick_cex = 0.495, ylab_cex = 0.585)
 
   fig_region  <- par("fig")
   fig_x1 <- fig_region[1]; fig_x2 <- fig_region[2]
