@@ -52,7 +52,11 @@ suppressPackageStartupMessages({
 ## ---------------------------
 ## Paths
 ## ---------------------------
-PROJECT_ROOT <- "/mnt/ceph-hdd/projects/scc_ufff_gailing/chano_TGC"
+# === USER CONFIGURATION ===
+# Set TGC_PROJECT_ROOT as an environment variable, or edit the fallback path below
+PROJECT_ROOT <- Sys.getenv("TGC_PROJECT_ROOT",
+  unset = "/path/to/your/project")
+# ===========================
 
 rds_dir  <- file.path(PROJECT_ROOT, "RESULTS/TBS/RANALYSIS/METHYLKIT_OBJECTS")
 fig_dir  <- file.path(PROJECT_ROOT, "RESULTS/TBS/RANALYSIS/FIGURES/FIG3_FIG4")

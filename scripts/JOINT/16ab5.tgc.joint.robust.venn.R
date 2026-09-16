@@ -115,7 +115,11 @@ OUT_W_2SET <- 20; OUT_H_2SET <- 12   # wider canvas for 2-set horizontal Venns
 # 2) PATHS
 ############################################################
 
-PROJECT_ROOT <- "/mnt/ceph-hdd/projects/scc_ufff_gailing/chano_TGC"
+# === USER CONFIGURATION ===
+# Set TGC_PROJECT_ROOT as an environment variable, or edit the fallback path below
+PROJECT_ROOT <- Sys.getenv("TGC_PROJECT_ROOT",
+  unset = "/path/to/your/project")
+# ===========================
 
 SIG_DIR  <- file.path(PROJECT_ROOT, "RESULTS", "JOINT", "COMBINED5", "sig_sites")
 OUT_ROOT <- file.path(PROJECT_ROOT, "RESULTS", "JOINT", "COMBINED5", "overlap")

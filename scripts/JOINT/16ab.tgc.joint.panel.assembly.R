@@ -56,7 +56,11 @@ CHR_LABEL_CEX     <- 1.02    # 1.20 × 0.85 — reduced 15% to prevent "Un" clip
 # 2) PATHS
 ############################################################
 
-PROJECT_ROOT <- "/mnt/ceph-hdd/projects/scc_ufff_gailing/chano_TGC"
+# === USER CONFIGURATION ===
+# Set TGC_PROJECT_ROOT as an environment variable, or edit the fallback path below
+PROJECT_ROOT <- Sys.getenv("TGC_PROJECT_ROOT",
+  unset = "/path/to/your/project")
+# ===========================
 
 RESULT_ROOTS <- list(
   GENESIS5    = file.path(PROJECT_ROOT, "RESULTS", "JOINT", "GENESIS5",    "MEQTL"),
