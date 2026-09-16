@@ -1,22 +1,22 @@
 #!/usr/bin/env Rscript
 ############################################################
-# TreeGeneClimate (TGC) — TBS
-# Step 6b (UPDATED): Plot methylation level (%) per group
-#   - Breeding cohort: per family (17 families) -> panels a/b/c
-#   - Natural cohort:  per stand  (25 stands)   -> panels d/e/f
+# TreeGeneClimate (TGC) — TMS
+# Step 6b: Plot per-sample mean methylation (%) by group
+#   - Breeding cohort: per family (17 families) -> panels A, C, E
+#   - Natural cohort:  per stand  (25 stands)   -> panels B, D, F
 #   - One plot per context (CpG/CHG/CHH)
 #   - Statistical tests + posthoc + logs
 #
 # STYLE:
-#   - Titles: only "a)" ... "f)" (no extra title text)
+#   - Panel titles: single bold capital letter (A–F), no extra text
 #   - No legend
 #   - Annotation: only p-value (no method label)
 #   - Posthoc letters angled; spaced above boxes to reduce overlap
 #
 # PANEL LAYOUT (FIG34_PANEL_COMBINED):
-#   Top row:    a) breeding CpG  |  b) natural CpG
-#   Middle row: c) breeding CHG  |  d) natural CHG
-#   Bottom row: e) breeding CHH  |  f) natural CHH
+#   Top row:    A (breeding CpG)  |  B (natural CpG)
+#   Middle row: C (breeding CHG)  |  D (natural CHG)
+#   Bottom row: E (breeding CHH)  |  F (natural CHH)
 #
 # INPUT:
 #   RDS from Step 5b (after unite) in:

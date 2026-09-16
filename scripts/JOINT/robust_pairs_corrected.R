@@ -1,18 +1,19 @@
 #!/usr/bin/env Rscript
 ############################################################
-# Robust meQTL pair correction
+# TreeGeneClimate (TGC) — JOINT ECS + TMS
+# Robust meQTL pairs — pair-level criterion with genomic coordinates
 #
-# Recomputes robust pairs (FDR < 1e-10 in BOTH GENESIS5 and MatrixEQTL5)
-# with true genomic coordinates for SNP positions.
+# Identifies robust SNP–methylation site pairs defined as those passing
+# FDR < 1e-10 independently in both GENESIS5 and MatrixEQTL5.
 #
-# Fixes:
-#   - snp_pos: was GDS-internal sequential index from GENESIS5 output;
-#     replaced with true bp position from snp_variant_annot.rds
-#   - site_chr / site_pos: parsed from the site string identifier
-#     (format: "PA_chrXX:start-end") — no separate annotation file needed
-#   - No effect-direction filter (positive and negative beta both included)
-#   - Matching by integer snp_id + site string (consistent across tools
-#     since both used the same input GDS/methylation files)
+# Implementation notes:
+#   - SNP positions taken from snp_variant_annot.rds (true genomic bp),
+#     not from GDS-internal sequential indices
+#   - Methylation site coordinates parsed from the site string identifier
+#     (format: "PA_chrXX:start-end"); no separate annotation file required
+#   - Cross-cohort comparisons use chromosome name + bp position,
+#     since integer SNP identifiers are assigned independently per cohort
+#   - Both positive and negative effect directions are retained
 #
 # Outputs:
 #   overlap/tables/robust_markers_breeding_corrected.tsv
