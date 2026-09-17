@@ -272,7 +272,7 @@ for (tool in TOOLS) {
         draw_qq(); dev.off()
         # EPS and PNG skipped: EPS OOMs on large natural-context datasets (>1 GB vector
         # file); PNG render of millions of scatter points is prohibitively slow.
-        # 14ab only needs the TIFF; 19ab exports PDF from native source.
+        # TIFF + PDF above are sufficient for Supplementary Fig. S2/S3.
       }
 
       # Significant-site tables (all SNP-site pairs passing threshold)

@@ -13,9 +13,9 @@ natural *Picea abies* cohorts, across three cytosine contexts (CpG, CHG, CHH).
 | 4b1 | `4b1.tgc.tms.meth.extractor.array.sh` | BAM | CpG/CHG/CHH coverage files | Bismark methylation extractor |
 | 4b2 | `4b2.tgc.tms.meth.filtering.array.sh` | coverage files | filtered coverage files (≥ 5×) | awk/bash |
 | 5b | `5b.tgc.methylkit.filtering.sh` / `5b.tgc.tms.import.data.methylkit.R` | filtered coverage | methylKit objects per context | methylKit |
-| 6b | `6b.tgc.tms.methylation.levels.anova.R` | methylKit objects | methylation level ANOVA results + figures | R base, ggplot2 |
-| 7b | `7b.tgc.tms.pcs.dapc.heatmaps.R` | methylKit objects | PCA, DAPC, heatmap figures | adegenet, ggplot2 |
-| 8b | `8b.tgc.tms.heatmaps.R` | methylKit objects, DAPC | heatmap figures (TIFF/PDF) | ggplot2, pheatmap |
+| 6b | `6b.tgc.tms.methylation.levels.R` | methylKit objects | Extended Data Fig. 2 — methylation level panel + ANOVA results | R base, ggplot2 |
+| 7b | `7b.tgc.tms.pca.R` | methylKit objects | Figure 2 — epigenomic PCA panel | ggplot2, patchwork |
+| 8b | `8b.tgc.tms.heatmaps.R` | methylKit objects | Extended Data Fig. 3 — SVMP heatmap panel (TIFF/PDF) | ComplexHeatmap |
 
 ## Compute requirements
 
@@ -45,4 +45,4 @@ module load miniforge3 bowtie2 samtools
 # Bismark must be installed and accessible in PATH
 ```
 
-R packages: `methylKit`, `data.table`, `ggplot2`, `adegenet`, `pheatmap`
+R packages: `methylKit`, `data.table`, `ggplot2`, `patchwork`, `ComplexHeatmap`, `circlize`

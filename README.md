@@ -43,8 +43,8 @@ scripts/
 | 6a | `6a.tgc.ecs.beagle.imputation.sh` | BEAGLE imputation |
 | 7a | `7a.tgc.ecs.plink.ibd.sh` | IBD estimation |
 | 8a | `8a.tgc.ecs.orchestrator.R` | GDS construction, GRM, kinship |
-| 9a | `9a.tgc.ecs.pca.R` | Principal component analysis |
-| 10a | `10a.tgc.ecs.grm.ibd.dapc.biplot.R` | GRM, IBD, DAPC figures |
+| 9a | `9a.tgc.ecs.pca.R` | Figure 1 — genetic PCA panel |
+| 10a | `10a.tgc.ecs.grm.ibd.R` | Extended Data Fig. 1 — GRM + IBD panel |
 
 ### TMS (DNA methylation)
 
@@ -56,9 +56,9 @@ scripts/
 | 4b1 | `4b1.tgc.tms.meth.extractor.array.sh` | Methylation extraction |
 | 4b2 | `4b2.tgc.tms.meth.filtering.array.sh` | Coverage filtering |
 | 5b | `5b.tgc.methylkit.filtering.sh` / `5b.tgc.tms.import.data.methylkit.R` | methylKit import and filtering |
-| 6b | `6b.tgc.tms.methylation.levels.anova.R` | Methylation level ANOVAs |
-| 7b | `7b.tgc.tms.pcs.dapc.heatmaps.R` | PCA, DAPC, heatmaps |
-| 8b | `8b.tgc.tms.heatmaps.R` | Heatmap figures |
+| 6b | `6b.tgc.tms.methylation.levels.R` | Extended Data Fig. 2 — methylation level panel + ANOVAs |
+| 7b | `7b.tgc.tms.pca.R` | Figure 2 — epigenomic PCA panel |
+| 8b | `8b.tgc.tms.heatmaps.R` | Extended Data Fig. 3 — SVMP heatmap panel |
 
 ### Joint analyses
 
@@ -68,12 +68,11 @@ scripts/
 | 12ab0 | `12ab0.tgc.joint.meqtl.input.prep.R` | meQTL input preparation (M-values, GRM, PCs) |
 | 12ab1 | `12ab1.tgc.joint.matrixeqtl.mapping.R` | MatrixEQTL cis-meQTL mapping (linear model) |
 | 12ab2 | `12ab2.tgc.joint.genesis.mapping.R` | GENESIS cis-meQTL mapping (LMM + GRM) |
-| 13ab | `13ab.tgc.joint.meqtl.combined.results.R` | Combined results, QQ plots, summary tables |
-| 14ab | `14ab.tgc.joint.manhattan.plots.R` | Circular Manhattan plots |
-| 15ab | `15ab.tgc.joint.venn.overlap.R` / `.sh` | Overlap analysis across tools and contexts |
-| 16ab | `16ab.tgc.joint.panel.assembly.R` / `.sh` | Multi-panel figure assembly |
-| 17ab | `17ab.tgc.joint.marker.annotation.R` / `.sh` | Marker annotation against reference GFF3 |
-| 18ab | `18ab.tgc.joint.summary.tables.R` | Manuscript summary tables (ECS + TMS) |
+| 13ab | `13ab.tgc.joint.meqtl.combined.results.R` | Table 1, Supp. Figs. S2–S3, Supp. Table S5 — combined results, QQ plots, robust pairs |
+| 14ab | `14ab.tgc.joint.manhattan.plots.R` / `.sh` | Figure 3, Extended Data Fig. 4 — circular Manhattan plots + combined panels |
+| 15ab | `15ab.tgc.joint.venn.overlap.R` / `.sh` | Figure 4, Supp. Fig. S4 — overlap analysis across tools and contexts |
+| 16ab | `16ab.tgc.joint.meth.heritability.R` / `.sh` | Figure 5 — SNP-based methylation heritability |
+| 17ab | `17ab.tgc.joint.marker.annotation.R` / `.sh` | Table 2, Table 3, Supp. Table S3, S6, S7 — marker annotation against reference GFF3 |
 
 ## Dependencies
 
@@ -87,14 +86,14 @@ scripts/
 - `data.table`, `SNPRelate`, `gdsfmt`, `SeqArray`, `SeqVarTools`
 - `GENESIS`, `MatrixEQTL`
 - `methylKit`
-- `ggplot2`, `circlize`, `adegenet`, `MASS`
+- `ggplot2`, `circlize`, `ComplexHeatmap`, `patchwork`, `MASS`
 
 ## Quick start
 
 1. Set `PROJECT_ROOT` at the top of each script to your local project directory.
 2. Adapt SLURM directives (`--account`, `--partition`, `--mail-user`) for your cluster.
 3. Run scripts in the order listed above. ECS and TMS steps (1a–10a, 1b–8b) can
-   be run in parallel; joint steps (11ab–18ab) require both to be complete first.
+   be run in parallel; joint steps (11ab–17ab) require both to be complete first.
 
 ## Data availability
 

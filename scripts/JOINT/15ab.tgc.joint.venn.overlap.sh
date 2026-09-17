@@ -5,8 +5,8 @@
 #
 # Reads significant meQTL results (p_FDR < 1e-10) from 13ab.R and produces:
 #   - 6 Venn diagrams (tool comparison per cohort×context; cohort vs context comparisons)
-#   - SuppFig5 panel: 3×2 tool-comparison Venns
-#   - Figure 6 panel: 1×5 contexts + cohorts Venns
+#   - Supp Fig S4 panel: 2×3 tool-comparison Venns
+#   - Figure 4 panel: tool-overlap (A,B) + cross-cohort position overlap (C,D,E)
 #   - overlap_summary.tsv
 #
 # REQUIRES

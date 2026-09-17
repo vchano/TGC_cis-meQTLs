@@ -8,16 +8,15 @@ cis-meQTL mapping in *Picea abies*. Requires ECS steps 1a–10a and TMS steps
 
 | Step | Script(s) | Input | Output | Tool |
 |------|-----------|-------|--------|------|
-| 11ab | `11ab.tgc.joint.correlation.analysis.R` | ECS PCs, TMS PCs | Procrustes / correlation figures | vegan, ggplot2 |
+| 11ab | `11ab.tgc.joint.correlation.analysis.R` | ECS IBS distance, TMS Euclidean distance | Supp. Fig. S1 — Procrustes panel; Mantel/Procrustes/RV tables | vegan, ade4, ggplot2 |
 | 12ab0 | `12ab0.tgc.joint.meqtl.input.prep.R` | GDS, GRM, methylKit objects | M-value matrices, SNP annotation, PCs, GRM (RDS + TSV) | data.table, SeqArray |
 | 12ab1 | `12ab1.tgc.joint.matrixeqtl.mapping.R` | outputs of 12ab0 | cis-meQTL results per panel (RDS) | MatrixEQTL |
 | 12ab2 | `12ab2.tgc.joint.genesis.mapping.R` | outputs of 12ab0 | cis-meQTL results per panel (RDS) | GENESIS |
-| 13ab | `13ab.tgc.joint.meqtl.combined.results.R` | outputs of 12ab1 + 12ab2 | comprehensive summary TSV, QQ plots (TIFF), significant site lists | data.table |
-| 14ab | `14ab.tgc.joint.manhattan.plots.R` | outputs of 12ab1 + 12ab2 | circular Manhattan plots (TIFF/PDF) | circlize |
-| 15ab | `15ab.tgc.joint.venn.overlap.R` / `.sh` | significant site lists from 13ab | Venn diagrams, overlap tables | VennDiagram, data.table |
-| 16ab | `16ab.tgc.joint.panel.assembly.R` / `.sh` | TIFF figures | multi-panel figures (TIFF/PDF) | ImageMagick |
-| 17ab | `17ab.tgc.joint.marker.annotation.R` / `.sh` | significant markers, reference GFF3 | annotated marker tables (TSV) | data.table |
-| 18ab | `18ab.tgc.joint.summary.tables.R` | pipeline outputs, MultiQC stats | manuscript summary tables (TSV + markdown) | data.table |
+| 13ab | `13ab.tgc.joint.meqtl.combined.results.R` | outputs of 12ab1 + 12ab2 | Table 1, Supp. Figs. S2–S3 (QQ plots), Supp. Table S5 (robust pairs) | data.table, openxlsx2 |
+| 14ab | `14ab.tgc.joint.manhattan.plots.R` / `.sh` | outputs of 12ab1 + 12ab2 | Figure 3 (GENESIS), Extended Data Fig. 4 (MatrixEQTL) — circular Manhattan + combined panels | circlize, magick |
+| 15ab | `15ab.tgc.joint.venn.overlap.R` / `.sh` | significant site lists from 13ab | Figure 4, Supp. Fig. S4 — Venn diagrams, overlap tables | ggvenn, data.table |
+| 16ab | `16ab.tgc.joint.meth.heritability.R` / `.sh` | GRM, M-value matrices, robust meQTL sites from 15ab | Figure 5 — SNP-based (and pedigree-based) methylation heritability | data.table, ggplot2 |
+| 17ab | `17ab.tgc.joint.marker.annotation.R` / `.sh` | SVMPs (8b), robust markers (15ab), reference GFF3 | Table 2, Table 3, Supp. Table S3, S6, S7 — annotated marker tables | data.table, openxlsx2 |
 
 ## Key parameters
 
@@ -38,10 +37,10 @@ cis-meQTL mapping in *Picea abies*. Requires ECS steps 1a–10a and TMS steps
 | 12ab1 | 48 | ~6 h per panel | Run as SLURM array (6 panels) |
 | 12ab2 | 48 | ~24 h per panel | AIREML is slower; BREEDING CHH ~48 h |
 | 13ab | 16 | ~2 h | |
-| 14ab | 8 | ~2 h | |
-| 15ab–16ab | 8 | ~1 h | |
+| 14ab | 4 | ~6 h | FDR_AXIS=TRUE on NATURAL/CHH needs ~96 GB RAM |
+| 15ab | 8 | ~1 h | |
+| 16ab | 8 | ~1–several h | Distribute across nodes for >100k sites (see .sh) |
 | 17ab | 8 | ~2 h | Requires reference GFF3 |
-| 18ab | 8 | ~30 min | |
 
 ## Dependencies
 
@@ -52,4 +51,4 @@ module load imagemagick/7.1.1-39
 ```
 
 R packages: `data.table`, `GENESIS`, `MatrixEQTL`, `SeqArray`, `SeqVarTools`,
-`SNPRelate`, `circlize`, `ggplot2`, `VennDiagram`
+`SNPRelate`, `circlize`, `ggplot2`, `patchwork`, `ggvenn`, `openxlsx2`, `vegan`, `ade4`

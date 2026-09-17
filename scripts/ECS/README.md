@@ -15,8 +15,8 @@ SNP genotyping from exome capture data for the breeding and natural *Picea abies
 | 6a | `6a.tgc.ecs.beagle.imputation.sh` | filtered VCF (per cohort) | imputed VCF | BEAGLE |
 | 7a | `7a.tgc.ecs.plink.ibd.sh` | PLINK bed (LD-pruned) | IBD pairwise estimates (.genome) | PLINK 1.9 |
 | 8a | `8a.tgc.ecs.orchestrator.R` | imputed VCF, IBD, PCA, ADMIXTURE | GDS, GRM, kinship matrices (RDS + TSV) | SNPRelate, gdsfmt |
-| 9a | `9a.tgc.ecs.pca.R` | GDS | PCA figures (TIFF/PDF) | SNPRelate, ggplot2 |
-| 10a | `10a.tgc.ecs.grm.ibd.dapc.biplot.R` | GRM, IBD, ADMIXTURE | GRM/IBD/DAPC figures (TIFF/PDF) | adegenet, ggplot2 |
+| 9a | `9a.tgc.ecs.pca.R` | GDS | Figure 1 — genetic PCA panel (TIFF/PDF) | SNPRelate, ggplot2 |
+| 10a | `10a.tgc.ecs.grm.ibd.R` | GRM, IBD, ADMIXTURE | Extended Data Fig. 1 — GRM/IBD panel (TIFF/PDF) | ComplexHeatmap, ggplot2 |
 
 ## Compute requirements
 
@@ -40,4 +40,4 @@ module load r/4.5.2
 module load fastqc trimmomatic bowtie2 samtools bcftools vcftools plink/1.9 beagle
 ```
 
-R packages: `SNPRelate`, `gdsfmt`, `dplyr`, `tibble`, `readr`, `ggplot2`, `adegenet`, `MASS`
+R packages: `SNPRelate`, `gdsfmt`, `dplyr`, `tibble`, `readr`, `ggplot2`, `patchwork`, `ComplexHeatmap`, `circlize`

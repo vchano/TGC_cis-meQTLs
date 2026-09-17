@@ -13,7 +13,7 @@
 #   - Annotation: only p-value (no method label)
 #   - Posthoc letters angled; spaced above boxes to reduce overlap
 #
-# PANEL LAYOUT (FIG34_PANEL_COMBINED):
+# PANEL LAYOUT (Extended Data Figure 2):
 #   Top row:    A (breeding CpG)  |  B (natural CpG)
 #   Middle row: C (breeding CHG)  |  D (natural CHG)
 #   Bottom row: E (breeding CHH)  |  F (natural CHH)
@@ -27,7 +27,7 @@
 #
 # OUTPUT:
 #   Figures:
-#     .../RESULTS/TBS/RANALYSIS/FIGURES/FIG3_FIG4/
+#     .../RESULTS/TBS/RANALYSIS/FIGURES/EDF2/
 #   Logs + posthoc tables:
 #     .../RESULTS/TBS/RANALYSIS/ANOVA.METHYL.LEVEL/
 ############################################################
@@ -59,7 +59,7 @@ PROJECT_ROOT <- Sys.getenv("TGC_PROJECT_ROOT",
 # ===========================
 
 rds_dir  <- file.path(PROJECT_ROOT, "RESULTS/TBS/RANALYSIS/METHYLKIT_OBJECTS")
-fig_dir  <- file.path(PROJECT_ROOT, "RESULTS/TBS/RANALYSIS/FIGURES/FIG3_FIG4")
+fig_dir  <- file.path(PROJECT_ROOT, "RESULTS/TBS/RANALYSIS/FIGURES/EDF2")
 log_dir  <- file.path(PROJECT_ROOT, "RESULTS/TBS/RANALYSIS/ANOVA.METHYL.LEVEL")
 
 map_file_breeding <- file.path(PROJECT_ROOT, "DATA/METADATA/breeding_sample2family.txt")
@@ -347,20 +347,20 @@ cat("Log dir:  ", log_dir, "\n\n", sep = "")
 # MEF-filtered data is used downstream for SVMP analysis (Step 8b) only.
 prefer_mef <- FALSE
 
-# BREEDING -> panels a/c/e (left column, per context)
-res_b_CpG <- analyze_one_clean("BREEDING", "CpG", map_file_breeding, colors.17, "FIG3a_BREEDING", "A",
+# BREEDING -> panels A/C/E (left column, per context)
+res_b_CpG <- analyze_one_clean("BREEDING", "CpG", map_file_breeding, colors.17, "EDF2a_BREEDING", "A",
                                prefer_mef = prefer_mef, letter_angle = 45, letter_yfactor = 0.12)
-res_b_CHG <- analyze_one_clean("BREEDING", "CHG", map_file_breeding, colors.17, "FIG3c_BREEDING", "C",
+res_b_CHG <- analyze_one_clean("BREEDING", "CHG", map_file_breeding, colors.17, "EDF2c_BREEDING", "C",
                                prefer_mef = prefer_mef, letter_angle = 45, letter_yfactor = 0.12)
-res_b_CHH <- analyze_one_clean("BREEDING", "CHH", map_file_breeding, colors.17, "FIG3e_BREEDING", "E",
+res_b_CHH <- analyze_one_clean("BREEDING", "CHH", map_file_breeding, colors.17, "EDF2e_BREEDING", "E",
                                prefer_mef = prefer_mef, letter_angle = 45, letter_yfactor = 0.12)
 
-# NATURAL -> panels b/d/f (right column, per context)
-res_n_CpG <- analyze_one_clean("NATURAL", "CpG", map_file_natural, colors.25, "FIG4b_NATURAL", "B",
+# NATURAL -> panels B/D/F (right column, per context)
+res_n_CpG <- analyze_one_clean("NATURAL", "CpG", map_file_natural, colors.25, "EDF2b_NATURAL", "B",
                                prefer_mef = prefer_mef, letter_angle = 45, letter_yfactor = 0.12)
-res_n_CHG <- analyze_one_clean("NATURAL", "CHG", map_file_natural, colors.25, "FIG4d_NATURAL", "D",
+res_n_CHG <- analyze_one_clean("NATURAL", "CHG", map_file_natural, colors.25, "EDF2d_NATURAL", "D",
                                prefer_mef = prefer_mef, letter_angle = 45, letter_yfactor = 0.12)
-res_n_CHH <- analyze_one_clean("NATURAL", "CHH", map_file_natural, colors.25, "FIG4f_NATURAL", "F",
+res_n_CHH <- analyze_one_clean("NATURAL", "CHH", map_file_natural, colors.25, "EDF2f_NATURAL", "F",
                                prefer_mef = prefer_mef, letter_angle = 45, letter_yfactor = 0.12)
 
 cat("\n\n====================\nSUMMARY\n====================\n")
@@ -393,14 +393,14 @@ panel_combined <-
 
 save_all_formats(
   panel_combined,
-  file.path(fig_dir, "FIG34_PANEL_COMBINED_CpG_CHG_CHH.tiff"),
+  file.path(fig_dir, "ExtendedDataFig2_methylation_levels_panel.tiff"),
   w_cm = 48, h_cm = 42
 )
 
 corrected_dir <- file.path(PROJECT_ROOT, "RESULTS/CORRECTED/FIGURES/NEW")
 dir.create(corrected_dir, showWarnings = FALSE, recursive = TRUE)
 for (ext in c("tiff", "pdf", "eps", "png")) {
-  src <- file.path(fig_dir, paste0("FIG34_PANEL_COMBINED_CpG_CHG_CHH.", ext))
+  src <- file.path(fig_dir, paste0("ExtendedDataFig2_methylation_levels_panel.", ext))
   if (file.exists(src)) file.copy(src, corrected_dir, overwrite = TRUE)
 }
 

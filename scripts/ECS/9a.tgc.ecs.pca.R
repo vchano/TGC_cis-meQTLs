@@ -1,3 +1,12 @@
+#!/usr/bin/env Rscript
+############################################################
+# TreeGeneClimate (TGC) — ECS
+# Step 9a: Figure 1 — Genetic PCA panel (breeding + natural cohorts)
+#
+# OUTPUT:
+#   RESULTS/ECS/RANALYSIS/PCA/Figure1_PCA_panel_A-F.tiff (+ pdf, eps, png)
+############################################################
+
 suppressPackageStartupMessages({
   library(dplyr)      # data wrangling
   library(tibble)     # tidy data frames
@@ -105,33 +114,13 @@ read_plink_eigen <- function(eigvec_file, eigval_file) {
 }
 
 # ------------------------------------------------------------------------------
-# Plot builders
+# Plot builder
 # ------------------------------------------------------------------------------
-# Scree plot: bar + line chart showing proportion of variance explained (PVE)
-# per PC. Used to judge how many PCs capture meaningful population structure.
-make_scree_plot <- function(eigval, title_label = "a)") {
-  pve <- eigval / sum(eigval)  # convert raw eigenvalues to proportions
-  df <- tibble(PC = seq_along(eigval), PVE = pve)
-
-  ggplot(df, aes(x = PC, y = PVE)) +
-    geom_col(fill = "grey40", width = 0.8) +
-    geom_line(aes(y = PVE), color = "grey20") +
-    geom_point(color = "grey20", size = 1.4) +
-    scale_y_continuous(labels = percent_format(accuracy = 1), expand = expansion(mult = c(0, 0.05))) +
-    scale_x_continuous(breaks = scales::pretty_breaks(n = 10)) +
-    labs(title = title_label, x = "Principal component", y = "Variance explained") +
-    theme_minimal(base_size = 12) +
-    theme(
-      plot.title = element_text(hjust = 0),
-      panel.grid.minor = element_blank()
-    )
-}
-
 # PCA scatter for a user-specified pair of PCs (x, y).
 # Axis labels include the percentage of variance explained by each PC,
 # computed from the full eigenvalue vector so the proportion is global.
 make_pca_scatter <- function(df_scores, eigval, x = 1, y = 2, group_col = "Group",
-                             palette_named, title_label = "a)") {
+                             palette_named, title_label = "A)") {
   stopifnot(paste0("PC", x) %in% names(df_scores), paste0("PC", y) %in% names(df_scores))
   pve <- eigval / sum(eigval)
 
@@ -180,47 +169,27 @@ scores_n <- eigvec_n %>%
   mutate(Group = ifelse(is.na(Group), "Unknown", as.character(Group)))
 
 # ------------------------------------------------------------------------------
-# Scree panel (two plots side-by-side), TIFF 24 cm x 12 cm @ 600 dpi
-# Both cohorts on the same figure for direct comparison of explained variance.
-# ------------------------------------------------------------------------------
-scree_b <- make_scree_plot(eigval_b, title_label = "a)")
-scree_n <- make_scree_plot(eigval_n, title_label = "b)")
-
-scree_panel <- scree_b + scree_n + plot_layout(ncol = 2, guides = "collect")
-
-# 600 dpi / LZW compression meets most journal submission requirements.
-# PDF and EPS are also written for vector-format submission; PNG at 150 dpi
-# provides a lightweight preview.
-scree_tiff <- file.path(fig_dir, "pca_scree_breeding_natural.tiff")
-tiff(scree_tiff, width = 24, height = 12, units = "cm", res = 600, compression = "lzw")
-print(scree_panel)
-dev.off()
-ggsave(sub("\\.tiff$", ".pdf", scree_tiff), plot = scree_panel, width = 24, height = 12, units = "cm")
-ggsave(sub("\\.tiff$", ".eps", scree_tiff), plot = scree_panel, device = cairo_ps, width = 24, height = 12, units = "cm")
-ggsave(sub("\\.tiff$", ".png", scree_tiff), plot = scree_panel, device = "png",      width = 24, height = 12, units = "cm", dpi = 150)
-
-# ------------------------------------------------------------------------------
-# PCA panel — single 6-plot panel (a–f), TIFF 34 cm x 26 cm @ 600 dpi
-#   Row 1: breeding  a) PC1v2  b) PC1v3  c) PC2v3
-#   Row 2: natural   d) PC1v2  e) PC1v3  f) PC2v3
+# Figure 1 — single 6-plot panel (A-F), TIFF 34 cm x 26 cm @ 600 dpi
+#   Row 1: breeding  A) PC1v2  B) PC1v3  C) PC2v3
+#   Row 2: natural   D) PC1v2  E) PC1v3  F) PC2v3
 #
 # Showing PC1vs2, PC1vs3, and PC2vs3 captures the three leading axes of
 # genetic differentiation without repeating information; this is a standard
 # layout for reporting population structure in forest-tree studies.
 # ------------------------------------------------------------------------------
 p_b_12 <- make_pca_scatter(scores_b, eigval_b, x = 1, y = 2, group_col = "Group",
-                           palette_named = colors.17, title_label = "a)")
+                           palette_named = colors.17, title_label = "A)")
 p_b_13 <- make_pca_scatter(scores_b, eigval_b, x = 1, y = 3, group_col = "Group",
-                           palette_named = colors.17, title_label = "b)")
+                           palette_named = colors.17, title_label = "B)")
 p_b_23 <- make_pca_scatter(scores_b, eigval_b, x = 2, y = 3, group_col = "Group",
-                           palette_named = colors.17, title_label = "c)")
+                           palette_named = colors.17, title_label = "C)")
 
 p_n_12 <- make_pca_scatter(scores_n, eigval_n, x = 1, y = 2, group_col = "Group",
-                           palette_named = colors.25, title_label = "d)")
+                           palette_named = colors.25, title_label = "D)")
 p_n_13 <- make_pca_scatter(scores_n, eigval_n, x = 1, y = 3, group_col = "Group",
-                           palette_named = colors.25, title_label = "e)")
+                           palette_named = colors.25, title_label = "E)")
 p_n_23 <- make_pca_scatter(scores_n, eigval_n, x = 2, y = 3, group_col = "Group",
-                           palette_named = colors.25, title_label = "f)")
+                           palette_named = colors.25, title_label = "F)")
 
 # patchwork: '|' composes panels horizontally, '/' stacks rows, '&' applies
 # theme modifications to all panels in the assembled layout simultaneously.
@@ -232,7 +201,7 @@ pca_row_n <- (p_n_12 | p_n_13 | p_n_23) + plot_layout(guides = "collect") &
   theme(legend.position = "right", legend.justification = "top")
 pca_panel <- pca_row_b / pca_row_n
 
-pca_tiff <- file.path(fig_dir, "pca_panel_a-f.tiff")
+pca_tiff <- file.path(fig_dir, "Figure1_PCA_panel_A-F.tiff")
 tiff(pca_tiff, width = 34, height = 26, units = "cm", res = 600, compression = "lzw")
 print(pca_panel)
 dev.off()
@@ -240,6 +209,6 @@ ggsave(sub("\\.tiff$", ".pdf", pca_tiff), plot = pca_panel, width = 34, height =
 ggsave(sub("\\.tiff$", ".eps", pca_tiff), plot = pca_panel, device = cairo_ps, width = 34, height = 26, units = "cm")
 ggsave(sub("\\.tiff$", ".png", pca_tiff), plot = pca_panel, device = "png",      width = 34, height = 26, units = "cm", dpi = 150)
 
-cat("Saved:\n", scree_tiff, "\n", pca_tiff, "\n", sep = "")
+cat("Saved: ", pca_tiff, "  [Figure 1]\n", sep = "")
 
 sessionInfo()

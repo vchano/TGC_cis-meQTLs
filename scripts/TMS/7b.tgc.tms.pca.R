@@ -1,29 +1,21 @@
 #!/usr/bin/env Rscript
 ############################################################
 # TreeGeneClimate (TGC) — TMS
-# Step 7b (UPDATED): PCA panel (supp) + DAPC panel (Figure 5) + DAPC loadings TSVs
+# Step 7b: Figure 2 — Epigenomic PCA panel (breeding + natural cohorts)
 #
-# CHANGES (requested):
-# - OMIT heatmaps entirely (to be done later as Step 8b).
-# - Save PCA as ONE panel (a–f) with shared legend per row:
-#     top row = breeding (CpG, CHG, CHH) + legend at right of c)
-#     bottom  = natural  (CpG, CHG, CHH) + legend at right of f)
-# - Save DAPC biplots as ONE panel (a–f) with same layout/legend behavior.
-# - Remove the bold ggplot titles (no duplicated titles). Panel letters are drawn inside plots.
-# - Fix epimarker IDs: use genomic labels chr:start (chr:pos) instead of V123 / V1 etc.
-# - Fix loadings tables: output loc/chr/pos (pos=start) + DF + loading.
+# Save PCA as ONE panel (A-F) with shared legend per row:
+#   top row = breeding (CpG, CHG, CHH) + legend at right of C)
+#   bottom  = natural  (CpG, CHG, CHH) + legend at right of F)
+# Panel letters are drawn inside plots (ggplot title).
+# Epimarker IDs use genomic labels chr:start (chr:pos) instead of V123 / V1 etc.
 #
 # INPUT:
 #   RESULTS/TMS/RANALYSIS/METHYLKIT_OBJECTS/
 #     methylBase_<cohort>_<context>_cov5_50_mpg*_mef0.05.rds
 #
 # OUTPUT:
-#   RESULTS/TMS/RANALYSIS/FIGURES/FIG5_FIG6/
-#     SUPP_PCA_panel_a-f.tiff
-#     Figure5_DAPC_panel_a-f.tiff
-#
-#   RESULTS/TMS/RANALYSIS/TABLES/dapc_loadings/
-#     TMS_DAPC_loadings_<cohort>_<context>_ALL.tsv
+#   RESULTS/TMS/RANALYSIS/FIGURES/FIG2/
+#     Figure2_PCA_panel_A-F.tiff (+ pdf, eps, png)
 ############################################################
 
 suppressPackageStartupMessages({
@@ -33,14 +25,10 @@ suppressPackageStartupMessages({
   library(ggplot2)
   library(scales)
   library(grid)
-  library(adegenet)   # dapc()
-  library(ggrepel)    # non-overlapping text labels for loading vectors
-  library(tidyr)
   library(patchwork)
 })
 
 options(stringsAsFactors = FALSE)
-set.seed(1)   # ensures reproducible DAPC (which uses random SVD internally)
 
 # ==============================================================================
 # 1) PATHS
@@ -51,11 +39,9 @@ PROJECT_ROOT <- Sys.getenv("TGC_PROJECT_ROOT",
   unset = "/path/to/your/project")
 # ===========================
 rds_dir <- file.path(PROJECT_ROOT, "RESULTS/TMS/RANALYSIS/METHYLKIT_OBJECTS")
-fig_dir <- file.path(PROJECT_ROOT, "RESULTS/TMS/RANALYSIS/FIGURES/FIG5_FIG6")
-tab_dir <- file.path(PROJECT_ROOT, "RESULTS/TMS/RANALYSIS/TABLES/dapc_loadings")
+fig_dir <- file.path(PROJECT_ROOT, "RESULTS/TMS/RANALYSIS/FIGURES/FIG2")
 
 dir.create(fig_dir, recursive = TRUE, showWarnings = FALSE)
-dir.create(tab_dir, recursive = TRUE, showWarnings = FALSE)
 
 map_file_breeding <- file.path(PROJECT_ROOT, "DATA/METADATA/breeding_sample2family.txt")
 map_file_natural  <- file.path(PROJECT_ROOT, "DATA/METADATA/natural_sample2pop.txt")
@@ -67,7 +53,7 @@ ensure_file(map_file_natural)
 # ==============================================================================
 # 2) PALETTES
 # ==============================================================================
-# Named vectors: consistent group-to-color mapping used across PCA and DAPC panels
+# Named vectors: consistent group-to-color mapping used across all PCA panels
 colors.17 <- c(
   "Family_16"="dodgerblue2","Family_27"="#E31A1C","Family_32"="green4",
   "Family_33"="#6A3D9A","Family_38"="#FF7F00","Family_39"="black",
@@ -123,7 +109,7 @@ pick_rds_mef <- function(cohort, ctx) {
 
 # Convert methylBase to methylation % matrix (sites x samples) + site info table
 # Row names of the returned matrix are set to genomic "loc" IDs (chr:start-end)
-# so that DAPC variable names are interpretable rather than V1, V2, ...
+# so that PCA loadings are interpretable rather than V1, V2, ...
 methylbase_to_matrix <- function(mb) {
   d <- getData(mb)
 
@@ -157,8 +143,6 @@ methylbase_to_matrix <- function(mb) {
     p
   }, numeric(nrow(d)))
 
-  # IMPORTANT FIX:
-  # Set rownames to loc so DAPC loadings are loc (not V1, V2, ...)
   rownames(perc_mat) <- site_df$loc
   colnames(perc_mat) <- sample_ids
 
@@ -185,7 +169,7 @@ max_na_frac_by_ctx <- function(ctx) {
 
 # Remove high-missingness sites, then impute remaining NAs by site mean.
 # Sites with near-zero variance after imputation are also removed (would
-# inflate artificial PCs and destabilise DAPC).
+# inflate artificial PCs).
 filter_and_impute_sites <- function(X_samples_x_sites,
                                     max_na_frac = 0.20,
                                     min_sd = 1e-8) {
@@ -225,42 +209,6 @@ run_pca <- function(X_samples_x_sites, max_na_frac = 0.20) {
   list(pr = pr, pve = pve, X_used = X2)
 }
 
-# DAPC (Discriminant Analysis of Principal Components) via adegenet.
-# n.pca is chosen conservatively to avoid over-fitting (retaining too many PCs
-# inflates classification accuracy without biological meaning).
-run_dapc <- function(X_samples_x_sites, group_factor, max_na_frac = 0.20) {
-  group_factor <- factor(group_factor)
-  X2 <- filter_and_impute_sites(X_samples_x_sites, max_na_frac = max_na_frac)$X
-
-  # Cap n.pca below n_samples - n_groups to avoid rank deficiency
-  n.pca <- max(10L, min(80L, nrow(X2) - nlevels(group_factor)))
-  # Number of discriminant functions = min(2, n_groups - 1) for biplot display
-  n.da  <- max(1L, min(2L, nlevels(group_factor) - 1L))
-
-  fit <- adegenet::dapc(x = X2, grp = group_factor, n.pca = n.pca, n.da = n.da, var.contrib = TRUE)
-
-  coords <- as.data.frame(fit$ind.coord)
-  colnames(coords) <- paste0("DF", seq_len(ncol(coords)))
-
-  # var.contr: contribution of each locus to each discriminant function
-  vc <- as.data.frame(fit$var.contr)
-  if (nrow(vc) == 0) stop("DAPC var.contr empty.")
-  vc$loc <- rownames(vc)  # should now be chr:start-end
-
-  num_cols <- which(vapply(vc, is.numeric, logical(1)))
-  if (length(num_cols) < 2) stop("DAPC loadings missing 2 numeric DF columns.")
-  df1_col <- names(vc)[num_cols[1]]
-  df2_col <- names(vc)[num_cols[2]]
-
-  # Reshape loadings to long format for easier downstream handling
-  load_long <- bind_rows(
-    vc %>% transmute(loc = loc, DF = "DF1", loading = .data[[df1_col]]),
-    vc %>% transmute(loc = loc, DF = "DF2", loading = .data[[df2_col]])
-  )
-
-  list(fit = fit, coords = coords, load_long = load_long, X_used = X2)
-}
-
 make_pca_scatter <- function(scores_df, pve, palette_named) {
   pal <- subset_palette(palette_named, scores_df$Group)
 
@@ -275,72 +223,6 @@ make_pca_scatter <- function(scores_df, pve, palette_named) {
     theme(
       panel.grid.minor = element_blank(),
       legend.title = element_blank()
-    )
-}
-
-# Build DAPC biplot: individual scores + top loading vectors for DF1 and DF2.
-# Vectors are scaled into individual score space for readability.
-build_dapc_biplot <- function(dapc_res, site_df_used, group_vec, palette_named) {
-  coords <- dapc_res$coords
-  coords$Group <- as.character(group_vec)
-
-  # key: loc -> chrpos (chr:start) (requested)
-  key <- site_df_used %>%
-    dplyr::select(loc, chr, pos, chrpos)
-
-  # Pivot loadings wide to get DF1 and DF2 as columns for each locus
-  ld_w <- dapc_res$load_long %>%
-    filter(DF %in% c("DF1","DF2")) %>%
-    tidyr::pivot_wider(names_from = DF, values_from = loading)
-
-  # Top 5 loci by |loading| on DF1 and DF2 respectively; deduplicate overlaps
-  top1 <- ld_w %>% arrange(desc(abs(DF1))) %>% slice_head(n = 5)
-  top2 <- ld_w %>% arrange(desc(abs(DF2))) %>% slice_head(n = 5)
-
-  topm <- bind_rows(top1, top2) %>%
-    distinct(loc, .keep_all = TRUE) %>%
-    left_join(key, by = "loc") %>%
-    mutate(label = ifelse(is.na(chrpos), loc, chrpos))
-
-  # scale loading vectors into individual space
-  ind_r <- sqrt(coords$DF1^2 + coords$DF2^2)
-  max_ind_r <- max(ind_r, na.rm = TRUE)
-  load_r <- sqrt(topm$DF1^2 + topm$DF2^2)
-  max_load_r <- max(load_r, na.rm = TRUE)
-  # Scale factor: vectors fill 85% of individual score radius
-  scale_factor <- ifelse(is.finite(max_load_r) && max_load_r > 0, (0.85 * max_ind_r) / max_load_r, 1)
-  topm <- topm %>% mutate(DF1s = DF1 * scale_factor, DF2s = DF2 * scale_factor)
-
-  pal <- subset_palette(palette_named, coords$Group)
-
-  ggplot(coords, aes(x = DF1, y = DF2, color = Group)) +
-    geom_point(size = 1.8, alpha = 0.9) +
-    scale_color_manual(values = pal) +
-    labs(x = "DF1", y = "DF2") +
-    theme_minimal(base_size = 14) +
-    theme(
-      panel.grid.minor = element_blank(),
-      legend.title = element_blank()
-    ) +
-    # Loading vectors as arrows from origin
-    geom_segment(
-      data = topm,
-      aes(x = 0, y = 0, xend = DF1s, yend = DF2s),
-      inherit.aes = FALSE,
-      arrow = grid::arrow(length = unit(0.18, "cm")),
-      color = "black",
-      linewidth = 0.6
-    ) +
-    # Non-overlapping genomic labels (chr:start) at arrow tips
-    ggrepel::geom_text_repel(
-      data = topm,
-      aes(x = DF1s, y = DF2s, label = label),
-      inherit.aes = FALSE,
-      size = 3.0,
-      min.segment.length = 0.05,
-      box.padding = 0.25,
-      point.padding = 0.2,
-      segment.size = 0.3
     )
 }
 
@@ -386,13 +268,9 @@ analyze_one <- function(cohort, ctx, map_path, palette_named) {
   # transpose to samples x sites; because rownames(perc_mat)=loc, colnames(X)=loc
   X <- t(perc_sites_x_samples)
 
-  # site_df_used must align to columns of X (loc)
-  site_df_used0 <- site_df[match(colnames(X), site_df$loc), ]
-  if (any(is.na(site_df_used0$loc))) stop("Could not align site_df with matrix columns (loc).")
-
   max_na_frac <- max_na_frac_by_ctx(ctx)
 
-  # PCA on the full filtered site set (unsupervised; used as a supplementary figure)
+  # PCA on the full filtered site set
   pca <- run_pca(X, max_na_frac = max_na_frac)
   pve <- pca$pve
   scores <- as.data.frame(pca$pr$x[, 1:2, drop = FALSE])
@@ -400,30 +278,10 @@ analyze_one <- function(cohort, ctx, map_path, palette_named) {
   scores$Group <- as.character(group_factor)
   p_pca <- make_pca_scatter(scores, pve, palette_named)
 
-  # DAPC: supervised ordination maximising between-group variance
-  dapc <- run_dapc(X, group_factor, max_na_frac = max_na_frac)
-
-  # Align site_df to DAPC-used columns (sites can differ from PCA after SD filter)
-  site_df_used <- site_df[match(colnames(dapc$X_used), site_df$loc), ]
-  if (any(is.na(site_df_used$loc))) stop("Could not align site_df with DAPC markers (loc).")
-
-  p_dapc <- build_dapc_biplot(dapc, site_df_used, group_factor, palette_named)
-
-  # Write per-locus loading table with genomic coordinates (chr, pos=start)
-  load_all <- dapc$load_long %>%
-    left_join(site_df_used %>% dplyr::select(loc, chr, pos), by = "loc") %>%
-    dplyr::relocate(chr, pos, DF, loading, .after = loc)
-
-  out_tsv <- file.path(tab_dir, sprintf("TMS_DAPC_loadings_%s_%s_ALL.tsv",
-                                        tolower(cohort), tolower(ctx)))
-  write.table(load_all, out_tsv, sep = "\t", quote = FALSE, row.names = FALSE)
-
   list(
     cohort = cohort,
     ctx = ctx,
-    pca_plot = p_pca,
-    dapc_plot = p_dapc,
-    loadings_tsv = out_tsv
+    pca_plot = p_pca
   )
 }
 
@@ -439,16 +297,16 @@ res_n_chg <- analyze_one("NATURAL", "CHG", map_file_natural, colors.25)
 res_n_chh <- analyze_one("NATURAL", "CHH", map_file_natural, colors.25)
 
 # ==============================================================================
-# 6) PCA PANEL (a–f) with shared legend per row
+# 6) FIGURE 2 — PCA PANEL (A-F) with shared legend per row
 # ==============================================================================
-# Top row: breeding (a=CpG, b=CHG, c=CHH); bottom row: natural (d=CpG, e=CHG, f=CHH)
-pca_a <- add_panel_label(res_b_cpg$pca_plot, "a)")
-pca_b <- add_panel_label(res_b_chg$pca_plot, "b)")
-pca_c <- add_panel_label(res_b_chh$pca_plot, "c)")
+# Top row: breeding (A=CpG, B=CHG, C=CHH); bottom row: natural (D=CpG, E=CHG, F=CHH)
+pca_a <- add_panel_label(res_b_cpg$pca_plot, "A)")
+pca_b <- add_panel_label(res_b_chg$pca_plot, "B)")
+pca_c <- add_panel_label(res_b_chh$pca_plot, "C)")
 
-pca_d <- add_panel_label(res_n_cpg$pca_plot, "d)")
-pca_e <- add_panel_label(res_n_chg$pca_plot, "e)")
-pca_f <- add_panel_label(res_n_chh$pca_plot, "f)")
+pca_d <- add_panel_label(res_n_cpg$pca_plot, "D)")
+pca_e <- add_panel_label(res_n_chg$pca_plot, "E)")
+pca_f <- add_panel_label(res_n_chh$pca_plot, "F)")
 
 # Collect legend per row so breeding and natural families/populations have separate legends
 pca_row1 <- (pca_a | pca_b | pca_c) + plot_layout(guides = "collect") & theme(legend.position = "right", legend.justification = "top")
@@ -456,40 +314,12 @@ pca_row2 <- (pca_d | pca_e | pca_f) + plot_layout(guides = "collect") & theme(le
 
 pca_panel <- pca_row1 / pca_row2
 
-out_pca_panel <- file.path(fig_dir, "SUPP_PCA_panel_a-f.tiff")
+out_pca_panel <- file.path(fig_dir, "Figure2_PCA_panel_A-F.tiff")
 save_panel_tiff(pca_panel, out_pca_panel, w_cm = 34, h_cm = 26, dpi = 600)
 
 # ==============================================================================
-# 7) DAPC PANEL (Figure 5 a–f) with shared legend per row
+# 7) FINISH
 # ==============================================================================
-dapc_a <- add_panel_label(res_b_cpg$dapc_plot, "a)")
-dapc_b <- add_panel_label(res_b_chg$dapc_plot, "b)")
-dapc_c <- add_panel_label(res_b_chh$dapc_plot, "c)")
-
-dapc_d <- add_panel_label(res_n_cpg$dapc_plot, "d)")
-dapc_e <- add_panel_label(res_n_chg$dapc_plot, "e)")
-dapc_f <- add_panel_label(res_n_chh$dapc_plot, "f)")
-
-dapc_row1 <- (dapc_a | dapc_b | dapc_c) + plot_layout(guides = "collect") & theme(legend.position = "right", legend.justification = "top")
-dapc_row2 <- (dapc_d | dapc_e | dapc_f) + plot_layout(guides = "collect") & theme(legend.position = "right", legend.justification = "top")
-
-dapc_panel <- dapc_row1 / dapc_row2
-
-out_dapc_panel <- file.path(fig_dir, "Figure5_DAPC_panel_a-f.tiff")
-save_panel_tiff(dapc_panel, out_dapc_panel, w_cm = 34, h_cm = 26, dpi = 600)
-
-# ==============================================================================
-# 8) FINISH
-# ==============================================================================
-cat("\nDONE Step 7b (PCA + DAPC only).\n\n")
-cat("Panels saved in:\n  ", fig_dir, "\n\n", sep = "")
-cat("  - ", basename(out_pca_panel), "\n", sep = "")
-cat("  - ", basename(out_dapc_panel), "\n\n", sep = "")
-cat("Loadings TSVs saved in:\n  ", tab_dir, "\n\n", sep = "")
-cat("  - ", res_b_cpg$loadings_tsv, "\n", sep = "")
-cat("  - ", res_b_chg$loadings_tsv, "\n", sep = "")
-cat("  - ", res_b_chh$loadings_tsv, "\n", sep = "")
-cat("  - ", res_n_cpg$loadings_tsv, "\n", sep = "")
-cat("  - ", res_n_chg$loadings_tsv, "\n", sep = "")
-cat("  - ", res_n_chh$loadings_tsv, "\n", sep = "")
+cat("\nDONE Step 7b.\n\n")
+cat("Saved: ", out_pca_panel, "  [Figure 2]\n", sep = "")
 sessionInfo()

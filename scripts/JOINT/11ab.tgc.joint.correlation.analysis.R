@@ -341,8 +341,8 @@ contexts <- c("CpG", "CHG", "CHH")
 plot_list <- list()
 summary_rows <- list()
 
-# Panel labels follow publication convention (a–f, top-left to bottom-right)
-panel_labels <- c("a)", "b)", "c)", "d)", "e)", "f)")
+# Panel labels follow publication convention (A–F, top-left to bottom-right)
+panel_labels <- c("A)", "B)", "C)", "D)", "E)", "F)")
 panel_i <- 1
 
 for (coh in names(cohorts)) {
@@ -419,7 +419,7 @@ for (coh in names(cohorts)) {
 ############################################################
 # 6) COMBINED 3x2 PROCRUSTES PANEL WITH COMMON LEGEND
 ############################################################
-# Constrain y-axis for NATURAL panels (d–f) which have tighter ordination spread
+# Constrain y-axis for NATURAL panels (D–F) which have tighter ordination spread
 plot_list[[4]] <- plot_list[[4]] + coord_cartesian(ylim = c(-0.05, 0.05))
 plot_list[[5]] <- plot_list[[5]] + coord_cartesian(ylim = c(-0.05, 0.05))
 plot_list[[6]] <- plot_list[[6]] + coord_cartesian(ylim = c(-0.05, 0.05))
@@ -434,7 +434,7 @@ combined_panel <-
     legend.direction = "horizontal"
   )
 
-out_panel <- file.path(OUT_FIG, "Figure11_ECS_TMS_Procrustes_panel.tiff")
+out_panel <- file.path(OUT_FIG, "SuppFigS1_ECS_TMS_Procrustes_panel.tiff")
 
 # Save in all required publication formats
 tiff(out_panel, width = 34, height = 24, units = "cm", res = 600, compression = "lzw")

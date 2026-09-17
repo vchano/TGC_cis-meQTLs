@@ -23,11 +23,11 @@
 #     robust_markers_{breeding,natural}.tsv    — meQTL site lists
 #
 # OUTPUTS (RESULTS/JOINT/HERITABILITY/)
-#   h2_all_sites.tsv.gz      — per-site h²_SNP [and h²_ped] results
-#   h2_summary.tsv           — aggregate stats per cohort × context
-#   h2_meqtl_vs_all.*        — figure: meQTL sites vs genome background
-#   h2_grm_vs_ped.*          — figure: h²_SNP vs h²_ped (breeding)
-#   h2_combined_panel.*      — combined A/B panel figure
+#   h2_all_sites.tsv.gz              — per-site h²_SNP [and h²_ped] results
+#   h2_summary.tsv                   — aggregate stats per cohort × context
+#   FIGURES/Figure5a_h2_meqtl_vs_all.*    — panel A: meQTL sites vs genome background
+#   FIGURES/Figure5b_h2_grm_vs_ped.*      — panel B: h²_SNP vs h²_ped (breeding)
+#   FIGURES/Figure5_heritability_panel.*  — combined A/B panel (Figure 5)
 #
 # NOTE: This script runs sequentially (all sites in memory per
 # cohort × context). For very large datasets (>100k sites) use
@@ -59,7 +59,7 @@ ROBUST_FILE <- file.path(PROJECT_ROOT,
   "RESULTS/JOINT/COMBINED5/overlap/tables/robust_markers_breeding.tsv")
 ROBUST_NAT  <- file.path(PROJECT_ROOT,
   "RESULTS/JOINT/COMBINED5/overlap/tables/robust_markers_natural.tsv")
-FIG_DIR     <- file.path(PROJECT_ROOT, "RESULTS/DRAFT")
+FIG_DIR     <- file.path(H2_ROOT, "FIGURES")
 
 dir.create(H2_ROOT, recursive = TRUE, showWarnings = FALSE)
 dir.create(FIG_DIR, recursive = TRUE, showWarnings = FALSE)
@@ -257,7 +257,7 @@ p_meqtl <- ggplot(h2_meqtl, aes(x = context_f, y = h2, fill = group, colour = gr
   theme(strip.background = element_rect(fill = "grey90"),
         legend.position  = "bottom",
         panel.grid.minor = element_blank())
-save_fig(file.path(H2_ROOT, "h2_meqtl_vs_all"), p_meqtl, width = 8, height = 4.5)
+save_fig(file.path(FIG_DIR, "Figure5a_h2_meqtl_vs_all"), p_meqtl, width = 8, height = 4.5)
 
 # Panel B: h²_SNP vs h²_ped (breeding cohort only)
 breed_h2 <- h2_all[cohort == "BREEDING" & !is.na(h2) & !is.na(h2_ped)]
@@ -280,16 +280,16 @@ if (nrow(breed_h2) > 0) {
     theme_bw(base_size = 11) +
     theme(strip.background = element_rect(fill = "grey90"),
           panel.grid.minor = element_blank())
-  save_fig(file.path(H2_ROOT, "h2_grm_vs_ped"), p_ped, width = 8, height = 3.5)
+  save_fig(file.path(FIG_DIR, "Figure5b_h2_grm_vs_ped"), p_ped, width = 8, height = 3.5)
 
-  # Combined two-panel figure
+  # Combined two-panel figure (Figure 5)
   combined <- (p_meqtl + labs(tag = "A") +
                  theme(plot.tag = element_text(face = "bold", size = 14))) /
               (p_ped   + labs(tag = "B") +
                  theme(plot.tag = element_text(face = "bold", size = 14))) +
     plot_layout(heights = c(4.5, 3.5))
-  save_fig(file.path(FIG_DIR, "h2_combined_panel"), combined, width = 8, height = 8)
-  msg("Saved: h2_combined_panel.*")
+  save_fig(file.path(FIG_DIR, "Figure5_heritability_panel"), combined, width = 8, height = 8)
+  msg("Saved: Figure5_heritability_panel.*  [Figure 5]")
 } else {
   msg("Skipping GRM-vs-pedigree figure (no breeding pedigree data)")
 }

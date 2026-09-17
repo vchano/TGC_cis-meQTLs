@@ -512,9 +512,9 @@ for (cohort in COHORTS) {
 
 ############################################################
 # 8b) PANEL ASSEMBLY
-#   Figure7 : row1 = ctx_plots (A,B — context comparison per cohort)
-#             row2 = cohort_plots (C,D,E — cohort comparison per context)
-#   SuppFig5: 2×3 grid, GENESIS5 vs MatrixEQTL5 per cohort×context
+#   Figure 4  : row1 = ctx_plots (A,B — tool overlap per cohort, all contexts)
+#               row2 = cohort_plots (C,D,E — cross-cohort position overlap per context)
+#   Supp Fig S4: 2×3 grid, GENESIS5 vs MatrixEQTL5 per cohort×context
 ############################################################
 
 log_msg("--- Panel assembly ---")
@@ -525,16 +525,16 @@ row2_valid <- Filter(Negate(is.null), cohort_plots)
 if (length(row1_valid) >= 1 && length(row2_valid) >= 1) {
   row1 <- Reduce(`+`, row1_valid) + plot_layout(ncol = length(row1_valid))
   row2 <- Reduce(`+`, row2_valid) + plot_layout(ncol = length(row2_valid))
-  fig7 <- row1 / row2 + plot_layout(heights = c(1, 1))
-  save_plot(fig7,
-            file.path(PANEL_DIR, "Figure7_Venn_contexts_cohorts_panel"),
+  fig4 <- row1 / row2 + plot_layout(heights = c(1, 1))
+  save_plot(fig4,
+            file.path(PANEL_DIR, "Figure4_Venn_contexts_cohorts_panel"),
             width_cm = 42, height_cm = 28)
-  save_plot(fig7,
-            file.path(CORRECTED_DIR, "Figure7_Venn_contexts_cohorts_panel"),
+  save_plot(fig4,
+            file.path(CORRECTED_DIR, "Figure4_Venn_contexts_cohorts_panel"),
             width_cm = 42, height_cm = 28)
-  log_msg("  Figure7 panel saved → ", PANEL_DIR, " and ", CORRECTED_DIR)
+  log_msg("  Figure 4 panel saved → ", PANEL_DIR, " and ", CORRECTED_DIR)
 } else {
-  log_msg("  WARNING: insufficient Venn plots for Figure7 panel")
+  log_msg("  WARNING: insufficient Venn plots for Figure 4 panel")
 }
 
 row1s <- Filter(Negate(is.null), supp_plots[paste0("BREEDING_", CONTEXTS)])
@@ -543,16 +543,16 @@ row2s <- Filter(Negate(is.null), supp_plots[paste0("NATURAL_",  CONTEXTS)])
 if (length(row1s) >= 1 && length(row2s) >= 1) {
   row1 <- Reduce(`+`, row1s) + plot_layout(ncol = 3)
   row2 <- Reduce(`+`, row2s) + plot_layout(ncol = 3)
-  fs5  <- row1 / row2 + plot_layout(heights = c(1, 1))
-  save_plot(fs5,
-            file.path(PANEL_DIR, "SuppFig5_Venn_tools_panel"),
+  fs4  <- row1 / row2 + plot_layout(heights = c(1, 1))
+  save_plot(fs4,
+            file.path(PANEL_DIR, "SuppFigS4_Venn_tools_panel"),
             width_cm = 54, height_cm = 24)
-  save_plot(fs5,
-            file.path(CORRECTED_DIR, "SuppFig5_Venn_tools_panel"),
+  save_plot(fs4,
+            file.path(CORRECTED_DIR, "SuppFigS4_Venn_tools_panel"),
             width_cm = 54, height_cm = 24)
-  log_msg("  SuppFig5 panel saved → ", PANEL_DIR, " and ", CORRECTED_DIR)
+  log_msg("  Supp Fig S4 panel saved → ", PANEL_DIR, " and ", CORRECTED_DIR)
 } else {
-  log_msg("  WARNING: insufficient Venn plots for SuppFig5 panel")
+  log_msg("  WARNING: insufficient Venn plots for Supp Fig S4 panel")
 }
 
 ############################################################

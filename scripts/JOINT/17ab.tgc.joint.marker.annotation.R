@@ -2,14 +2,17 @@
 ############################################################
 # TreeGeneClimate (TGC) — JOINT ECS + TMS
 # Step 17ab: Marker annotation against reference genome GFF3
+#            (Table 2, Table 3, Supplementary Table S3, S6, S7)
 #
 # Annotates:
-#   - ECS DAPC top-10 SNPs (per cohort x DF)
-#   - TMS DAPC top-10 methylation sites (per cohort x context x DF)
 #   - TMS KW SVMPs: breeding top-150 balanced + natural 6 formal SVMPs (step 8b)
+#     -> Supplementary Table S3
 #   - meQTL ROBUST markers: SNP + site positions significant at
 #     p_FDR < 1e-10 in BOTH GENESIS5 AND MatrixEQTL5
 #     (reads robust_markers_<cohort>.tsv from 15ab.R)
+#     -> Supplementary Table S6 (annotated robust SNPs)
+#     -> Supplementary Table S7 (annotated robust methylation sites)
+#   - Gene-centric summary -> Table 2 (top source genes), Table 3 (top target genes)
 #
 # Each marker is annotated with:
 #   - gene_id, gene_start, gene_end, gene_strand (GFF3 gene feature)
@@ -31,7 +34,6 @@ options(stringsAsFactors = FALSE)
 COHORTS  <- c("BREEDING", "NATURAL")
 CONTEXTS <- c("CpG", "CHG", "CHH")
 TOOLS    <- c("GENESIS5", "MATRIXEQTL5")
-TOP_N    <- 20L   # number of top markers to retain per DAPC discriminant function
 
 # Methylation classification thresholds (context-specific).
 # CHG/CHH methylation is generally much lower than CpG in conifers.
@@ -60,8 +62,6 @@ VCF_FILES <- list(
     "RESULTS/ECS/VCF_SPLIT/tgc.ecs.natural.call.filt.maf05.snvs.poly.imputed.vcf.gz")
 )
 
-DAPC_ECS_ROOT <- file.path(PROJECT_ROOT, "RESULTS/ECS/RANALYSIS/TABLES/dapc_loadings")
-DAPC_TMS_ROOT <- file.path(PROJECT_ROOT, "RESULTS/TMS/RANALYSIS/TABLES/dapc_loadings")
 # Robust marker tables produced by 15ab.R
 ROBUST_ROOT   <- file.path(PROJECT_ROOT, "RESULTS/JOINT/COMBINED5/overlap/tables")
 SVMP_ROOT     <- file.path(PROJECT_ROOT, "RESULTS/TMS/RANALYSIS/TABLES/heatmap_markers_8B")
@@ -474,152 +474,7 @@ func_annot <- load_functional_annotation()
 te_genes   <- load_te_gene_ids()
 
 ############################################################
-# 5) ECS DAPC — TOP-10 SNPs PER COHORT x DF
-############################################################
-
-msg("======================================================")
-msg("ECS DAPC — top-10 SNPs per cohort x DF")
-
-ecs_files <- list(
-  BREEDING = file.path(DAPC_ECS_ROOT, "breeding_dapc_loadings_all_DF1_DF2.csv"),
-  NATURAL  = file.path(DAPC_ECS_ROOT, "natural_dapc_loadings_all_DF1_DF2.csv")
-)
-
-ecs_list <- list()
-for (cohort in COHORTS) {
-  f <- ecs_files[[cohort]]
-  if (!file.exists(f)) { msg("  Missing: ", f); next }
-  dt <- fread(f, header = TRUE)
-  # Standardise column names (CSV header: chromosome,position,DF,loading)
-  setnames(dt, names(dt), c("chr", "pos", "DF", "loading"))
-  dt[, abs_loading := abs(loading)]
-  dt[, cohort := cohort]
-  # Top N by |loading| within each DF; loading magnitude indicates discriminatory power
-  top <- dt[order(-abs_loading), .SD[seq_len(min(TOP_N, .N))], by = DF]
-  top[, abs_loading := NULL]
-  ecs_list[[cohort]] <- top
-}
-
-ecs_top <- rbindlist(ecs_list, fill = TRUE)
-
-if (nrow(ecs_top) > 0) {
-  ecs_top[, marker_id := paste0(chr, ":", pos)]
-
-  # GFF3 annotation via bedtools
-  bed_path <- file.path(TMP_DIR, "ecs_dapc.bed")
-  write_marker_bed(ecs_top, "chr", "pos", "marker_id", bed_path)
-  ann <- run_bedtools_closest(bed_path, genes_bed_path)
-
-  if (nrow(ann) > 0) {
-    ecs_top <- merge(ecs_top,
-                     ann[, .(marker_id, gene_id, gene_chr, gene_start,
-                              gene_end, gene_strand, distance_bp)],
-                     by = "marker_id", all.x = TRUE)
-  }
-
-  # VCF allele info (per cohort) — imputed VCF first, raw VCF fallback for NA
-  vcf_parts <- lapply(COHORTS, function(co) {
-    sub <- ecs_top[cohort == co]
-    vi  <- query_vcf(data.table(chr = sub$chr, pos = as.integer(sub$pos)),
-                     VCF_FILES[[co]],
-                     file.path(TMP_DIR, paste0("ecs_vcf_", co)))
-    if (nrow(vi) > 0)
-      sub <- merge(sub, vi, by.x = c("chr","pos"), by.y = c("chr","pos"), all.x = TRUE)
-    else
-      sub[, c("ref","alt","af","dr2") := list(NA_character_, NA_character_,
-                                               NA_real_, NA_real_)]
-    sub <- fill_from_raw_vcf(sub, co,
-             file.path(TMP_DIR, paste0("ecs_raw_vcf_", co)))
-    sub
-  })
-  ecs_top <- rbindlist(vcf_parts, fill = TRUE)
-  ecs_top <- add_annotation_class(ecs_top)
-
-  # SNP-specific metadata; methylation fields set to NA for non-site markers
-  ecs_top[, source                   := "ECS_DAPC"]
-  ecs_top[, marker_type              := "SNP"]
-  ecs_top[, context                  := NA_character_]
-  ecs_top[, methylation_direction    := NA_character_]
-  ecs_top[, mean_beta                := NA_real_]
-  ecs_top[, meth_status_absolute     := NA_character_]
-  ecs_top[, higher_methylation_cohort := NA_character_]
-
-  ecs_top <- add_functional_annotation(ecs_top, func_annot, te_genes)
-  fwrite(ecs_top, file.path(OUT_ROOT, "ecs_dapc_top20_annotated.tsv"), sep = "\t")
-  msg("  Saved: ecs_dapc_top20_annotated.tsv (", nrow(ecs_top), " markers)")
-} else {
-  msg("  No ECS DAPC markers found.")
-  ecs_top <- data.table()
-}
-
-############################################################
-# 6) TMS DAPC — TOP-10 SITES PER COHORT x CONTEXT x DF
-############################################################
-
-msg("======================================================")
-msg("TMS DAPC — top-10 methylation sites per cohort x context x DF")
-
-tms_list <- list()
-for (cohort in COHORTS) {
-  for (ctx in CONTEXTS) {
-    f <- file.path(DAPC_TMS_ROOT,
-                   sprintf("TMS_DAPC_loadings_%s_%s_ALL.tsv",
-                           tolower(cohort), tolower(ctx)))
-    if (!file.exists(f)) { msg("  Missing: ", f); next }
-    dt <- fread(f, header = TRUE)
-    # TSV header: loc  chr  pos  DF  loading
-    setnames(dt, names(dt), c("loc", "chr", "pos", "DF", "loading"))
-    dt[, abs_loading := abs(loading)]
-    dt[, cohort  := cohort]
-    dt[, context := ctx]
-    top <- dt[order(-abs_loading), .SD[seq_len(min(TOP_N, .N))], by = DF]
-    top[, abs_loading := NULL]
-    tms_list[[paste(cohort, ctx)]] <- top
-  }
-}
-
-tms_top <- rbindlist(tms_list, fill = TRUE)
-
-if (nrow(tms_top) > 0) {
-  # GFF3 annotation via bedtools
-  bed_path <- file.path(TMP_DIR, "tms_dapc.bed")
-  write_marker_bed(tms_top, "chr", "pos", "loc", bed_path)
-  ann <- run_bedtools_closest(bed_path, genes_bed_path)
-
-  if (nrow(ann) > 0) {
-    setnames(ann, "marker_id", "loc")
-    tms_top <- merge(tms_top,
-                     ann[, .(loc, gene_id, gene_chr, gene_start,
-                              gene_end, gene_strand, distance_bp)],
-                     by = "loc", all.x = TRUE)
-  }
-
-  # Methylation sites are not in the VCF — set SNP-specific columns to NA
-  tms_top[, c("ref","alt","af","dr2") := list(NA_character_, NA_character_,
-                                               NA_real_, NA_real_)]
-  tms_top <- add_annotation_class(tms_top)
-  tms_top[, source      := "TMS_DAPC"]
-  tms_top[, marker_type := "methylation_site"]
-
-  # Option 1 — absolute methylation status (via loading sign + optional beta files)
-  # methylation_direction: sign of DAPC loading (positive/negative relative to DF axis)
-  tms_top[, methylation_direction := ifelse(loading > 0, "positive", "negative")]
-  tms_top <- add_meth_status(tms_top, site_col = "loc")
-  # Cross-cohort comparison not applicable for DAPC (per-cohort analysis)
-  tms_top[, higher_methylation_cohort := NA_character_]
-
-  setnames(tms_top, "loc", "marker_id")
-
-  tms_top <- add_functional_annotation(tms_top, func_annot, te_genes)
-  fwrite(tms_top, file.path(OUT_ROOT, "tms_dapc_top20_annotated.tsv"), sep = "\t")
-  msg("  Saved: tms_dapc_top20_annotated.tsv (", nrow(tms_top), " markers)")
-} else {
-  msg("  No TMS DAPC markers found.")
-  tms_top <- data.table()
-}
-
-############################################################
-# 6b) TMS KW SVMPs — SELECTED MARKERS FROM STEP 8b
+# 5) TMS KW SVMPs — SELECTED MARKERS FROM STEP 8b (Supplementary Table S3)
 #
 # Breeding: top-150 balanced (50 per context, all formal SVMPs)
 # Natural:  6 formal SVMPs only (3 CpG + 3 CHH; padj < 0.05)
@@ -703,7 +558,7 @@ if (length(svmp_all_list) == 0)
   msg("  No SVMP files found — section 6b produced no output.")
 
 ############################################################
-# 7) meQTL ROBUST MARKERS (p_FDR < 1e-10 in BOTH GENESIS5 AND MatrixEQTL5)
+# 6) meQTL ROBUST MARKERS (p_FDR < 1e-10 in BOTH GENESIS5 AND MatrixEQTL5)
 ############################################################
 
 msg("======================================================")
@@ -915,71 +770,7 @@ msg("--- Cross-cohort methylation direction (Option 2) ---")
 }
 
 ############################################################
-# 7b) CROSS-REFERENCE: ECS DAPC top SNPs × robust meQTL results
-#
-# For each ECS DAPC top SNP, checks whether it also appears as a robust meQTL
-# SNP (same cohort, matched by chr+pos). If so, fills in the associated
-# epimarker columns (n_associated_sites, associated_sites, associated_contexts,
-# associated_site_chrs, associated_site_pos) from the meQTL snp_site_map.
-# These columns are part of std_cols and will carry through to the combined table.
-############################################################
-
-msg("======================================================")
-msg("Cross-referencing ECS DAPC top SNPs with robust meQTL results...")
-
-if (nrow(ecs_top) > 0 && length(meqtl_results) > 0) {
-  ecs_top[, pos := as.integer(pos)]
-
-  for (co in COHORTS) {
-    key  <- paste(co, "snp")
-    rob  <- meqtl_results[[key]]
-    if (is.null(rob) || nrow(rob) == 0) next
-
-    assoc_cols <- intersect(
-      c("chr","pos","n_associated_sites","associated_sites",
-        "associated_contexts","associated_site_chrs","associated_site_pos"),
-      names(rob))
-    lk <- unique(rob[, .SD, .SDcols = assoc_cols])
-    lk[, pos := as.integer(pos)]
-
-    ecs_co <- ecs_top[cohort == co, .(marker_id, chr, pos)]
-    joined <- merge(ecs_co, lk, by = c("chr","pos"), all.x = TRUE)
-    matched <- joined[!is.na(n_associated_sites)]
-
-    if (nrow(matched) > 0) {
-      msg("  ", co, ": ", nrow(matched), " / ", nrow(ecs_co),
-          " DAPC top SNPs are also robust meQTL SNPs")
-      # Use set() for in-place assignment by row index (avoids copy overhead)
-      for (i in seq_len(nrow(matched))) {
-        mid  <- matched$marker_id[i]
-        idx  <- which(ecs_top$marker_id == mid & ecs_top$cohort == co)
-        if (!length(idx)) next
-        set(ecs_top, idx, "n_associated_sites",   matched$n_associated_sites[i])
-        set(ecs_top, idx, "associated_sites",      matched$associated_sites[i])
-        set(ecs_top, idx, "associated_contexts",   matched$associated_contexts[i])
-        if ("associated_site_chrs" %in% names(matched))
-          set(ecs_top, idx, "associated_site_chrs", matched$associated_site_chrs[i])
-        if ("associated_site_pos"  %in% names(matched))
-          set(ecs_top, idx, "associated_site_pos",  matched$associated_site_pos[i])
-      }
-    } else {
-      msg("  ", co, ": no DAPC top SNPs match robust meQTL SNPs by position")
-    }
-  }
-
-  # Overwrite the saved ECS DAPC annotation file with cross-reference added
-  fwrite(ecs_top, file.path(OUT_ROOT, "ecs_dapc_top20_annotated.tsv"), sep = "\t")
-  msg("  ECS DAPC annotation updated with meQTL epimarker cross-reference.")
-
-  in_mqtl_n <- if ("n_associated_sites" %in% names(ecs_top))
-    ecs_top[!is.na(n_associated_sites), .N] else 0L
-  msg("  ECS DAPC SNPs with associated epimarkers: ", in_mqtl_n, " / ", nrow(ecs_top))
-} else {
-  msg("  Skipping: ecs_top or meqtl_results is empty.")
-}
-
-############################################################
-# 8) COMBINED TABLE
+# 7) COMBINED TABLE
 ############################################################
 
 msg("======================================================")
@@ -1014,13 +805,6 @@ prep_for_combine <- function(dt, extra_id_col = NULL, pos_col = "pos",
 
 all_list <- list()
 
-if (nrow(ecs_top) > 0)
-  all_list[["ECS_DAPC"]] <- prep_for_combine(
-    ecs_top[, tool := NA_character_][, loading := loading])
-
-if (nrow(tms_top) > 0)
-  all_list[["TMS_DAPC"]] <- prep_for_combine(tms_top[, tool := NA_character_])
-
 for (key in names(meqtl_results))
   all_list[[key]] <- prep_for_combine(meqtl_results[[key]])
 
@@ -1040,7 +824,7 @@ if (length(all_list) > 0) {
 }
 
 ############################################################
-# 9) GENE-CENTRIC SUMMARY TABLE
+# 8) GENE-CENTRIC SUMMARY TABLE (Table 2 source genes, Table 3 target genes)
 ############################################################
 
 msg("======================================================")
@@ -1075,10 +859,10 @@ msg("Step 17ab finished. Outputs: ", OUT_ROOT)
 msg("======================================================")
 
 ############################################################
-# SECTION 10) SUPPLEMENTARY TABLE 6 — FILL MISSING REF/ALT/AF
+# SECTION 9) SUPPLEMENTARY TABLE S6 — FILL MISSING REF/ALT/AF
 #
 # Strategy:
-#   1. Read Supplementary Table 6 xlsx (headers on row 3)
+#   1. Read Supplementary Table S6 xlsx (headers on row 3)
 #   2. Collect unique (chr, pos, cohort) where ref is NA
 #   3. Query per-cohort imputed VCF (has AF in INFO)
 #   4. Fallback to raw per-cohort VCF (no AF)
@@ -1092,15 +876,22 @@ msg("======================================================")
 suppressPackageStartupMessages(library(openxlsx2))
 
 msg("======================================================")
-msg("Section 10: Supplementary Table 6 — fill missing ref/alt/af")
+msg("Section 9: Supplementary Table S6 — fill missing ref/alt/af")
 msg("======================================================")
 
 NATGEN_DIR <- file.path(PROJECT_ROOT, "RESULTS/DRAFT/NATURE.GENETICS")
 
-XLSX_S6_IN  <- file.path(NATGEN_DIR,
-  "260819_Chano.etal.2026_tgc_supp.tables.xlsx")
-XLSX_S6_OUT <- file.path(NATGEN_DIR,
-  "260819_Chano.etal.2026_tgc_supp.tables_corrected_s8.xlsx")
+# Master supplementary-tables workbook: file names carry a revision date
+# stamp (YYMMDD_...) that changes between submissions, so resolve it by
+# pattern instead of hardcoding a specific date. Picks the most recently
+# modified match if more than one is present.
+supp_candidates <- list.files(NATGEN_DIR,
+  pattern = "^[0-9]{6}_Chano\\.?etal\\.2026_tgc_supp\\.tables\\.xlsx$",
+  full.names = TRUE)
+XLSX_S6_IN <- if (length(supp_candidates) > 0)
+  supp_candidates[order(file.mtime(supp_candidates), decreasing = TRUE)][1] else
+  file.path(NATGEN_DIR, "Chano.etal.2026_tgc_supp.tables.xlsx")  # fallback; will trigger the missing-file check below
+XLSX_S6_OUT <- sub("\\.xlsx$", "_corrected.xlsx", XLSX_S6_IN)
 
 VCF_S6 <- list(
   BREEDING = list(
@@ -1129,7 +920,7 @@ dir.create(TMP_S6, recursive = TRUE, showWarnings = FALSE)
 
 BCFTOOLS_S6 <- Sys.which("bcftools")
 if (!nzchar(BCFTOOLS_S6)) {
-  msg("WARNING: bcftools not found — skipping Section 10 (load module bcftools)")
+  msg("WARNING: bcftools not found — skipping Section 9 (load module bcftools)")
 } else if (!file.exists(XLSX_S6_IN)) {
   msg("WARNING: Supplementary Table xlsx not found: ", XLSX_S6_IN)
 } else {
@@ -1148,7 +939,7 @@ if (!nzchar(BCFTOOLS_S6)) {
   }
 
   msg("Reading Supplementary Table 6...")
-  st6 <- as.data.table(read_xlsx(XLSX_S6_IN, sheet = "Supplementary Table 6",
+  st6 <- as.data.table(read_xlsx(XLSX_S6_IN, sheet = "Supplementary Table S6",
                                   start_row = 3))
   st6 <- st6[, names(st6)[!is.na(names(st6)) & names(st6) != "NA_"], with = FALSE]
   st6[, .row_idx := .I]
@@ -1278,15 +1069,15 @@ if (!nzchar(BCFTOOLS_S6)) {
   msg("Loading original workbook...")
   wb_s6 <- wb_load(XLSX_S6_IN)
   XLSX_DATA_START <- 4L
-  wb_s6 <- wb_add_data(wb_s6, sheet = "Supplementary Table 6",
+  wb_s6 <- wb_add_data(wb_s6, sheet = "Supplementary Table S6",
                         x = data.frame(ref = st6_fx$ref),
                         start_row = XLSX_DATA_START, start_col = COL_REF,
                         col_names = FALSE)
-  wb_s6 <- wb_add_data(wb_s6, sheet = "Supplementary Table 6",
+  wb_s6 <- wb_add_data(wb_s6, sheet = "Supplementary Table S6",
                         x = data.frame(alt = st6_fx$alt),
                         start_row = XLSX_DATA_START, start_col = COL_ALT,
                         col_names = FALSE)
-  wb_s6 <- wb_add_data(wb_s6, sheet = "Supplementary Table 6",
+  wb_s6 <- wb_add_data(wb_s6, sheet = "Supplementary Table S6",
                         x = data.frame(af = st6_fx$af),
                         start_row = XLSX_DATA_START, start_col = COL_AF,
                         col_names = FALSE)

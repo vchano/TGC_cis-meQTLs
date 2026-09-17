@@ -39,12 +39,6 @@ RUN_GDS_AND_GRM      <- TRUE   # VCF->GDS + GRM/Kinship
 RUN_LOAD_IBD         <- TRUE   # load PLINK IBD from step 7a
 RUN_IMPORT_PCA       <- TRUE   # read PLINK PCA outputs from step 5a
 RUN_IMPORT_ADMIXTURE <- TRUE   # read ADMIXTURE Q/P + CV summaries from step 5a
-RUN_SAVE_DAPC_INPUT  <- TRUE   # save a QC-filtered imputed dosage matrix for DAPC (no DAPC run)
-
-# MAF and missingness thresholds applied when preparing the DAPC dosage matrix.
-# These are intentionally lenient: DAPC is a descriptive ordination, not a test.
-DAPC_MAF_MIN  <- 0.05
-DAPC_MISS_MAX <- 0.10
 
 ############################################################
 # 1) PATHS (CEPH-HDD)
@@ -73,13 +67,11 @@ TAB_GRM   <- file.path(TABLES_DIR, "grm_kinship")
 TAB_IBD   <- file.path(TABLES_DIR, "ibd")
 TAB_PCA   <- file.path(TABLES_DIR, "pca")
 TAB_ADMIX <- file.path(TABLES_DIR, "admixture")
-TAB_DAPC  <- file.path(TABLES_DIR, "dapc_inputs")
 
 dir.create(TAB_GRM,   recursive = TRUE, showWarnings = FALSE)
 dir.create(TAB_IBD,   recursive = TRUE, showWarnings = FALSE)
 dir.create(TAB_PCA,   recursive = TRUE, showWarnings = FALSE)
 dir.create(TAB_ADMIX, recursive = TRUE, showWarnings = FALSE)
-dir.create(TAB_DAPC,  recursive = TRUE, showWarnings = FALSE)
 
 # Step 6a outputs (imputed)
 VCF_BREED_IMP <- file.path(VCF_SPLIT_DIR, "tgc.ecs.breeding.call.filt.maf05.snvs.poly.imputed.vcf.gz")
@@ -506,216 +498,6 @@ if (RUN_IMPORT_ADMIXTURE) {
   write_tsv(q_n, file.path(TAB_ADMIX, "natural_admixture_q_files.tsv"))
 
   message("ADMIXTURE imported (file indices + CV if available).")
-}
-
-############################################################
-# 8) DAPC INPUT (QC-filtered imputed dosages; no DAPC run)
-#    UPDATED: now also saves SNP map (loc/chr/pos) aligned to X
-#
-# The DAPC dosage matrix (X) uses a relaxed MAF/missingness filter
-# relative to the GRM because DAPC is a descriptive clustering method
-# rather than a linear mixed model requiring a positive-definite matrix.
-# Invariant SNPs (sd == 0) are still removed because they carry no
-# discriminant information and can destabilise the DA step.
-############################################################
-if (RUN_SAVE_DAPC_INPUT) {
-  message("=== DAPC INPUT: save QC-filtered imputed dosage matrices ===")
-
-  # -------------------- BREEDING --------------------
-  gds_breed <- file.path(RDATA_DIR, "breeding.imputed.snp.gds")
-  ensure_file(gds_breed)
-  breed_map <- if (file.exists(BREED_MAP_FILE)) read_map2(BREED_MAP_FILE, "Family") else tibble(IID = character(), Family = character())
-
-  local({
-    gf <- snpgdsOpen(gds_breed, allow.duplicate = FALSE)
-    on.exit(try(snpgdsClose(gf), silent = TRUE), add = TRUE)
-
-    samp <- read.gdsn(index.gdsn(gf, "sample.id"))
-
-    # Read the full SNP annotation vectors once; used later to build the
-    # aligned SNP map after filtering, avoiding multiple GDS traversals.
-    # cache full SNP vectors once (minimal overhead; avoids ambiguous mapping)
-    snp_id_all <- read.gdsn(index.gdsn(gf, "snp.id"))
-    chr_all    <- read.gdsn(index.gdsn(gf, "snp.chromosome"))
-    pos_all    <- read.gdsn(index.gdsn(gf, "snp.position"))
-
-    # Compute per-SNP MAF and missing-call rate across all samples in one pass
-    stat <- snpgdsSNPRateFreq(gf, with.id = TRUE, sample.id = samp)
-    maf  <- stat$MinorFreq
-    miss <- stat$MissingRate
-    snp_id <- stat$snp.id
-
-    keep <- is.finite(maf) & is.finite(miss) & maf >= DAPC_MAF_MIN & miss <= DAPC_MISS_MAX
-    if (sum(keep) == 0) stop("BREEDING DAPC: 0 SNPs pass QC (maf/miss thresholds).")
-
-    snp_id_keep <- snp_id[keep]
-
-    geno <- snpgdsGetGeno(gf, sample.id = samp, snp.id = snp_id_keep, snpfirstdim = TRUE, with.id = FALSE)
-    mode(geno) <- "numeric"
-    geno[geno > 2 | geno < 0] <- NA_real_
-
-    grp <- rep("Unknown", length(samp))
-    if (nrow(breed_map) > 0) {
-      g2 <- breed_map$Family[match(samp, breed_map$IID)]
-      g2[is.na(g2)] <- "Unknown"
-      grp <- g2
-    }
-    grp <- factor(grp)
-
-    # Remove SNPs that remain with undefined allele frequency after MAF filter
-    p_all <- rowMeans(geno, na.rm = TRUE) / 2
-    keep2 <- is.finite(p_all)
-    geno2 <- geno[keep2, , drop = FALSE]
-    p_all <- p_all[keep2]
-
-    snp_id_keep2 <- snp_id_keep[keep2]  # track SNP IDs through each filtering step
-
-    # Within-family mean imputation (same rationale as GRM block in Section 4)
-    for (g in levels(grp)) {
-      idx <- which(grp == g)
-      if (!length(idx)) next
-      pg <- rowMeans(geno2[, idx, drop = FALSE], na.rm = TRUE) / 2
-      pg[!is.finite(pg)] <- p_all[!is.finite(pg)]
-      missm <- is.na(geno2[, idx, drop = FALSE])
-      if (any(missm)) {
-        fill <- matrix(2 * pg, nrow = nrow(geno2), ncol = length(idx))
-        geno2[, idx][missm] <- fill[missm]
-      }
-    }
-    if (anyNA(geno2)) {
-      fill2 <- matrix(2 * p_all, nrow = nrow(geno2), ncol = ncol(geno2))
-      geno2[is.na(geno2)] <- fill2[is.na(geno2)]
-    }
-    geno2[geno2 < 0] <- 0; geno2[geno2 > 2] <- 2
-
-    X <- t(geno2); rownames(X) <- samp
-    sdv <- apply(X, 2, sd)
-    keep_var <- is.finite(sdv) & sdv > 0
-    if (!all(keep_var)) X <- X[, keep_var, drop = FALSE]
-
-    snp_id_final <- snp_id_keep2[keep_var]  # final post-QC SNP set
-
-    # Build a SNP annotation table (locus ID, chromosome, position) aligned
-    # column-for-column with X, so downstream DAPC loadings can be mapped
-    # back to genomic coordinates.
-    # build snp map aligned to X columns
-    idx_map <- match(snp_id_final, snp_id_all)
-    snp_df <- tibble(
-      loc = as.character(snp_id_final),
-      chr = as.character(chr_all[idx_map]),
-      pos = as.integer(pos_all[idx_map])
-    )
-
-    # ensure loadings rownames == loc
-    colnames(X) <- snp_df$loc
-
-    # Bundle all components needed by downstream DAPC scripts into one RDS,
-    # including QC parameters for reproducibility documentation.
-    out <- list(
-      X = X,
-      snp = snp_df,
-      group = tibble(IID = samp, Group = as.character(grp)),
-      qc = list(maf_min = DAPC_MAF_MIN, miss_max = DAPC_MISS_MAX),
-      note = "Imputed dosages derived from GT in Beagle-imputed VCF via SNPRelate GDS."
-    )
-    out_file <- file.path(RDATA_DIR, sprintf("breeding_dapc_input_maf%.2f_miss%.2f.rds", DAPC_MAF_MIN, DAPC_MISS_MAX))
-    saveRDS(out, out_file)
-    write_tsv(out$group, file.path(TAB_DAPC, "breeding_groups.tsv"))
-    write_tsv(out$snp,   file.path(TAB_DAPC, "breeding_snps_loc_chr_pos.tsv"))
-    message("Saved: ", out_file, " [", nrow(X), " x ", ncol(X), "]")
-  })
-
-  # -------------------- NATURAL --------------------
-  gds_natur <- file.path(RDATA_DIR, "natural.imputed.snp.gds")
-  ensure_file(gds_natur)
-  natur_map <- if (file.exists(NATUR_MAP_FILE)) read_map2(NATUR_MAP_FILE, "Population") else tibble(IID = character(), Population = character())
-
-  # Identical workflow to BREEDING above
-  local({
-    gf <- snpgdsOpen(gds_natur, allow.duplicate = FALSE)
-    on.exit(try(snpgdsClose(gf), silent = TRUE), add = TRUE)
-
-    samp <- read.gdsn(index.gdsn(gf, "sample.id"))
-
-    snp_id_all <- read.gdsn(index.gdsn(gf, "snp.id"))
-    chr_all    <- read.gdsn(index.gdsn(gf, "snp.chromosome"))
-    pos_all    <- read.gdsn(index.gdsn(gf, "snp.position"))
-
-    stat <- snpgdsSNPRateFreq(gf, with.id = TRUE, sample.id = samp)
-    maf  <- stat$MinorFreq
-    miss <- stat$MissingRate
-    snp_id <- stat$snp.id
-
-    keep <- is.finite(maf) & is.finite(miss) & maf >= DAPC_MAF_MIN & miss <= DAPC_MISS_MAX
-    if (sum(keep) == 0) stop("NATURAL DAPC: 0 SNPs pass QC (maf/miss thresholds).")
-
-    snp_id_keep <- snp_id[keep]
-
-    geno <- snpgdsGetGeno(gf, sample.id = samp, snp.id = snp_id_keep, snpfirstdim = TRUE, with.id = FALSE)
-    mode(geno) <- "numeric"
-    geno[geno > 2 | geno < 0] <- NA_real_
-
-    grp <- rep("Unknown", length(samp))
-    if (nrow(natur_map) > 0) {
-      g2 <- natur_map$Population[match(samp, natur_map$IID)]
-      g2[is.na(g2)] <- "Unknown"
-      grp <- g2
-    }
-    grp <- factor(grp)
-
-    p_all <- rowMeans(geno, na.rm = TRUE) / 2
-    keep2 <- is.finite(p_all)
-    geno2 <- geno[keep2, , drop = FALSE]
-    p_all <- p_all[keep2]
-
-    snp_id_keep2 <- snp_id_keep[keep2]
-
-    for (g in levels(grp)) {
-      idx <- which(grp == g)
-      if (!length(idx)) next
-      pg <- rowMeans(geno2[, idx, drop = FALSE], na.rm = TRUE) / 2
-      pg[!is.finite(pg)] <- p_all[!is.finite(pg)]
-      missm <- is.na(geno2[, idx, drop = FALSE])
-      if (any(missm)) {
-        fill <- matrix(2 * pg, nrow = nrow(geno2), ncol = length(idx))
-        geno2[, idx][missm] <- fill[missm]
-      }
-    }
-    if (anyNA(geno2)) {
-      fill2 <- matrix(2 * p_all, nrow = nrow(geno2), ncol = ncol(geno2))
-      geno2[is.na(geno2)] <- fill2[is.na(geno2)]
-    }
-    geno2[geno2 < 0] <- 0; geno2[geno2 > 2] <- 2
-
-    X <- t(geno2); rownames(X) <- samp
-    sdv <- apply(X, 2, sd)
-    keep_var <- is.finite(sdv) & sdv > 0
-    if (!all(keep_var)) X <- X[, keep_var, drop = FALSE]
-
-    snp_id_final <- snp_id_keep2[keep_var]
-
-    idx_map <- match(snp_id_final, snp_id_all)
-    snp_df <- tibble(
-      loc = as.character(snp_id_final),
-      chr = as.character(chr_all[idx_map]),
-      pos = as.integer(pos_all[idx_map])
-    )
-
-    colnames(X) <- snp_df$loc
-
-    out <- list(
-      X = X,
-      snp = snp_df,
-      group = tibble(IID = samp, Group = as.character(grp)),
-      qc = list(maf_min = DAPC_MAF_MIN, miss_max = DAPC_MISS_MAX),
-      note = "Imputed dosages derived from GT in Beagle-imputed VCF via SNPRelate GDS."
-    )
-    out_file <- file.path(RDATA_DIR, sprintf("natural_dapc_input_maf%.2f_miss%.2f.rds", DAPC_MAF_MIN, DAPC_MISS_MAX))
-    saveRDS(out, out_file)
-    write_tsv(out$group, file.path(TAB_DAPC, "natural_groups.tsv"))
-    write_tsv(out$snp,   file.path(TAB_DAPC, "natural_snps_loc_chr_pos.tsv"))
-    message("Saved: ", out_file, " [", nrow(X), " x ", ncol(X), "]")
-  })
 }
 
 message("=== 8a DONE. Outputs under: ", RANA_DIR)

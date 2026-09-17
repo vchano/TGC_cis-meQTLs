@@ -19,16 +19,17 @@
 #   - Clustering requires a numeric matrix without too many NAs:
 #       * Remaining NAs are imputed by locus mean (ONLY for heatmap/clustering)
 #
-# OUTPUT:
-#   RESULTS/TMS/RANALYSIS/FIGURES/HEATMAPS_8B/
-#     Figure7a_HEATMAP_breeding_top200_KW_BH.tiff
-#     Figure7b_HEATMAP_natural_top200_KW_BH.tiff
+# OUTPUT (Extended Data Figure 3):
+#   RESULTS/TMS/RANALYSIS/FIGURES/EDF3/
+#     EDF3a_HEATMAP_breeding_top150_KW_BH.tiff
+#     EDF3b_HEATMAP_natural_formal_SVMPs_KW_BH.tiff
+#     ExtendedDataFig3_SVMP_heatmaps_panel.tiff  (combined A+B panel)
 #
 #   RESULTS/TMS/RANALYSIS/TABLES/heatmap_markers_8B/
 #     TMS_8B_locus_tests_breeding_<ctx>.tsv
 #     TMS_8B_locus_tests_natural_<ctx>.tsv
-#     TMS_8B_selected_markers_breeding_top200.tsv
-#     TMS_8B_selected_markers_natural_top200.tsv
+#     TMS_8B_selected_markers_breeding_top150.tsv
+#     TMS_8B_selected_markers_natural_formal_SVMPs.tsv
 ############################################################
 
 suppressPackageStartupMessages({
@@ -57,7 +58,7 @@ PROJECT_ROOT <- Sys.getenv("TGC_PROJECT_ROOT",
 
 rds_dir <- file.path(PROJECT_ROOT, "RESULTS/TMS/RANALYSIS/METHYLKIT_OBJECTS")
 
-fig_dir <- file.path(PROJECT_ROOT, "RESULTS/TMS/RANALYSIS/FIGURES/HEATMAPS_8B")
+fig_dir <- file.path(PROJECT_ROOT, "RESULTS/TMS/RANALYSIS/FIGURES/EDF3")
 tab_dir <- file.path(PROJECT_ROOT, "RESULTS/TMS/RANALYSIS/TABLES/heatmap_markers_8B")
 
 dir.create(fig_dir, recursive = TRUE, showWarnings = FALSE)
@@ -597,41 +598,22 @@ process_cohort_for_heatmap <- function(cohort, map_path, palette_named,
 }
 
 # ==============================================================================
-# 5) RUN + SAVE HEATMAPS (2 per cohort; NO PANELS)
+# 5) RUN HEATMAPS (per cohort)
 # ==============================================================================
 topN <- 150L   # number of loci shown per heatmap (50 per context when balanced)
 
-# ---- BREEDING
+# ---- BREEDING (EDF3 panel A: top-150 balanced)
 res_b <- process_cohort_for_heatmap("BREEDING", map_file_breeding, colors.17, top_n = topN)
 
-out_b_bal <- file.path(fig_dir, sprintf("Figure7a_HEATMAP_breeding_top%d_BALANCED_KW_BH.tiff", topN))
-out_b_all <- file.path(fig_dir, sprintf("Figure7a2_HEATMAP_breeding_top%d_OVERALL_KW_BH.tiff", topN))
+out_b_bal <- file.path(fig_dir, sprintf("EDF3a_HEATMAP_breeding_top%d_KW_BH.tiff", topN))
 
 save_heatmap_tiff(res_b$X_sel_bal, res_b$group_vec, colors.17, res_b$ctx_vec_bal,
                   group_legend_title = "Family",
-                  out_file = out_b_bal, title_label = "a)",
+                  out_file = out_b_bal, title_label = "A)",
                   w_cm = 24, h_cm = 20, dpi = 600)
 
-save_heatmap_tiff(res_b$X_sel_all, res_b$group_vec, colors.17, res_b$ctx_vec_all,
-                  group_legend_title = "Family",
-                  out_file = out_b_all, title_label = "a)",
-                  w_cm = 24, h_cm = 20, dpi = 600)
-
-# ---- NATURAL
+# ---- NATURAL (locus tests only; EDF3 panel B uses the formal-SVMP subset below)
 res_n <- process_cohort_for_heatmap("NATURAL", map_file_natural, colors.25, top_n = topN)
-
-out_n_bal <- file.path(fig_dir, sprintf("Figure7b_HEATMAP_natural_top%d_BALANCED_KW_BH.tiff", topN))
-out_n_all <- file.path(fig_dir, sprintf("Figure7b2_HEATMAP_natural_top%d_OVERALL_KW_BH.tiff", topN))
-
-save_heatmap_tiff(res_n$X_sel_bal, res_n$group_vec, colors.25, res_n$ctx_vec_bal,
-                  group_legend_title = "Natural stand",
-                  out_file = out_n_bal, title_label = "b)",
-                  w_cm = 24, h_cm = 20, dpi = 600)
-
-save_heatmap_tiff(res_n$X_sel_all, res_n$group_vec, colors.25, res_n$ctx_vec_all,
-                  group_legend_title = "Natural stand",
-                  out_file = out_n_all, title_label = "b)",
-                  w_cm = 24, h_cm = 20, dpi = 600)
 
 # ==============================================================================
 # 6) NATURAL: FORMAL SVMPs ONLY (padj < 0.05) + COMBINED PANEL (a + b)
@@ -663,12 +645,12 @@ if (nrow(sig_df) >= 2) {
               file.path(tab_dir, "TMS_8B_selected_markers_natural_formal_SVMPs.tsv"),
               sep = "\t", quote = FALSE, row.names = FALSE)
 
-  # ---- Figure 7b: natural formal SVMPs standalone
-  out_n_sig <- file.path(fig_dir, "Figure7b_HEATMAP_natural_formal_SVMPs_KW_BH.tiff")
+  # ---- EDF3 panel B: natural formal SVMPs standalone
+  out_n_sig <- file.path(fig_dir, "EDF3b_HEATMAP_natural_formal_SVMPs_KW_BH.tiff")
   save_heatmap_tiff(X_sig, res_n$group_vec, colors.25, ctx_vec_sig,
                     group_legend_title = "Natural stand",
                     out_file         = out_n_sig,
-                    title_label      = "b)",
+                    title_label      = "B)",
                     cluster_cols     = TRUE,
                     show_annot_names = FALSE,   # annotation names omitted for the narrow panel
                     w_cm = 16, h_cm = 20, dpi = 600)
@@ -716,14 +698,14 @@ if (nrow(sig_df) >= 2) {
          annotation_legend_side = "right",
          merge_legend           = TRUE,
          newpage                = FALSE)
-    grid.text("a)",
+    grid.text("A)",
               x    = unit(0.35, "cm"),
               y    = unit(1, "npc") - unit(0.35, "cm"),
               just = c("left", "top"),
               gp   = label_gp)
     popViewport()
 
-    # Panel b — natural formal SVMPs
+    # Panel B — natural formal SVMPs
     pushViewport(viewport(x = frac_a, y = 0, width = 1 - frac_a, height = 1,
                           just = c("left", "bottom")))
     draw(ht_b_panel,
@@ -731,7 +713,7 @@ if (nrow(sig_df) >= 2) {
          annotation_legend_side = "right",
          merge_legend           = TRUE,
          newpage                = FALSE)
-    grid.text("b)",
+    grid.text("B)",
               x    = unit(0.35, "cm"),
               y    = unit(1, "npc") - unit(0.35, "cm"),
               just = c("left", "top"),
@@ -739,7 +721,7 @@ if (nrow(sig_df) >= 2) {
     popViewport()
   }
 
-  panel_tiff <- file.path(fig_dir, "Figure7_PANEL_ab_BALANCED_SVMPs.tiff")
+  panel_tiff <- file.path(fig_dir, "ExtendedDataFig3_SVMP_heatmaps_panel.tiff")
   tiff(panel_tiff, width = panel_w_cm, height = panel_h_cm,
        units = "cm", res = 600, compression = "lzw")
   draw_panel(); dev.off()
@@ -753,8 +735,8 @@ if (nrow(sig_df) >= 2) {
       width = panel_w_cm, height = panel_h_cm, units = "cm", res = 600)
   draw_panel(); dev.off()
 
-  cat("Figure 7b standalone (formal SVMPs): ", out_n_sig, "\n")
-  cat("Figure 7 combined panel (a + b):     ", panel_tiff, "\n")
+  cat("EDF3 panel B standalone (formal SVMPs): ", out_n_sig, "\n")
+  cat("Extended Data Fig. 3 combined panel:     ", panel_tiff, "\n")
 
 } else {
   cat("Fewer than 2 formal SVMPs in natural cohort — skipping 6-SVMP heatmap and panel.\n")
