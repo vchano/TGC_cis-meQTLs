@@ -99,7 +99,7 @@ CTX_FILL_COLORS <- list(
   NATURAL  = c(CpG = "#D7191C", CHG = "#1A9641", CHH = "#2C7BB6")   # dark: red/green/blue
 )
 
-# Panel labels follow figure conventions: supplementary a)–f), main A c)–e), main B a)–b)
+# Supplementary: BREEDING first (a–c), NATURAL second (d–f)
 SUPP_LABELS <- setNames(
   paste0(letters[1:6], ")"),
   c("BREEDING_CpG", "BREEDING_CHG", "BREEDING_CHH",
@@ -121,16 +121,16 @@ PROJECT_ROOT <- Sys.getenv("TGC_PROJECT_ROOT",
   unset = "/path/to/your/project")
 # ===========================
 
-# Input: significant pairs at the strict FDR threshold, produced by 13ab.R
 SIG_DIR  <- file.path(PROJECT_ROOT, "RESULTS", "JOINT", "COMBINED5", "sig_sites")
 OUT_ROOT <- file.path(PROJECT_ROOT, "RESULTS", "JOINT", "COMBINED5", "overlap")
-SUPP_DIR  <- file.path(OUT_ROOT, "supp")
-MAIN_DIR  <- file.path(OUT_ROOT, "main")
-TAB_DIR   <- file.path(OUT_ROOT, "tables")
-PANEL_DIR <- file.path(OUT_ROOT, "panels")
-LOG_DIR   <- file.path(PROJECT_ROOT, "RESULTS", "JOINT", "COMBINED5", "LOGS")
+SUPP_DIR      <- file.path(OUT_ROOT, "supp")
+MAIN_DIR      <- file.path(OUT_ROOT, "main")
+TAB_DIR       <- file.path(OUT_ROOT, "tables")
+PANEL_DIR     <- file.path(OUT_ROOT, "panels")
+LOG_DIR       <- file.path(PROJECT_ROOT, "RESULTS", "JOINT", "COMBINED5", "LOGS")
+CORRECTED_DIR <- file.path(PROJECT_ROOT, "RESULTS", "CORRECTED", "FIGURES", "NEW")
 
-for (d in c(SUPP_DIR, MAIN_DIR, TAB_DIR, PANEL_DIR, LOG_DIR))
+for (d in c(SUPP_DIR, MAIN_DIR, TAB_DIR, PANEL_DIR, LOG_DIR, CORRECTED_DIR))
   dir.create(d, recursive = TRUE, showWarnings = FALSE)
 
 LOGFILE <- file.path(LOG_DIR, "step15ab.log")
@@ -146,25 +146,30 @@ log_msg <- function(...) {
   cat(txt, "\n", file = LOGFILE, append = TRUE)
 }
 
-# Save a ggplot in all four formats; eps via cairo_ps for vector-safe rendering
 save_plot <- function(gg, base_path,
                       width_cm = OUT_W, height_cm = OUT_H) {
   if (is.null(gg)) return(invisible(NULL))
+  w_in <- width_cm  / 2.54
+  h_in <- height_cm / 2.54
   for (fmt in c("tiff", "pdf", "eps", "png", "svg")) {
-    out    <- paste0(base_path, ".", fmt)
-    dev    <- if (fmt == "eps") cairo_ps else fmt
-    dpi    <- if (fmt %in% c("tiff", "png")) OUT_RES else 150
-    tryCatch(
-      ggsave(out, plot = gg,
-             width = width_cm, height = height_cm, units = "cm",
-             device = dev, dpi = dpi),
-      error = function(e) log_msg("  ERROR (", fmt, "): ", conditionMessage(e))
-    )
+    out <- paste0(base_path, ".", fmt)
+    tryCatch({
+      if (fmt == "eps") {
+        grDevices::postscript(out, width = w_in, height = h_in,
+                              horizontal = FALSE, paper = "special", onefile = FALSE)
+        print(gg)
+        grDevices::dev.off()
+      } else {
+        dpi <- if (fmt %in% c("tiff", "png")) OUT_RES else 150
+        ggsave(out, plot = gg, width = width_cm, height = height_cm, units = "cm",
+               device = fmt, dpi = dpi)
+      }
+    }, error = function(e) log_msg("  ERROR (", fmt, "): ", conditionMessage(e)))
     log_msg("  Saved: ", out)
   }
 }
 
-# Human-readable labels for set names shown inside the Venn diagrams
+# Human-readable labels for set names
 SET_DISPLAY <- c(
   BREEDING    = "Breeding cohort",
   NATURAL     = "Natural cohort",
@@ -188,7 +193,6 @@ draw_venn <- function(set_list, fill_colors, panel_label = NULL, sname_size = 7)
   white_bg <- theme(plot.background  = element_rect(fill = "white", color = NA),
                     panel.background = element_rect(fill = "white", color = NA))
 
-  # Return an informative placeholder when fewer than 2 sets have any markers
   if (n < 2) {
     log_msg("    WARNING: fewer than 2 non-empty sets — skipping Venn")
     p <- ggplot() +
@@ -215,7 +219,7 @@ draw_venn <- function(set_list, fill_colors, panel_label = NULL, sname_size = 7)
   fcolors <- unname(fill_colors[orig_names])
   fcolors[is.na(fcolors)] <- "grey80"
 
-  # Apply human-readable display names after the set-ordering logic above
+  # Apply human-readable display names
   names(set_list) <- ifelse(orig_names %in% names(SET_DISPLAY),
                             SET_DISPLAY[orig_names], orig_names)
 
@@ -229,11 +233,6 @@ draw_venn <- function(set_list, fill_colors, panel_label = NULL, sname_size = 7)
               show_percentage = FALSE) +
     theme(plot.margin = margin(15, 15, 15, 15)) +
     white_bg
-
-  # Crop horizontal whitespace for 2-set Venns (circles at ±0.85, r=1.5,
-  # so data spans ±2.35; ggplot default expansion pushes well beyond that)
-  if (n == 2)
-    p <- p + coord_fixed(ratio = 1, clip = "off")
 
   if (!is.null(panel_label)) {
     lbl_up <- toupper(sub("[)]$", "", panel_label))
@@ -268,7 +267,6 @@ log_msg("Step 15ab — Venn overlap analysis")
 log_msg("ggvenn version: ", as.character(packageVersion("ggvenn")))
 log_msg("Reading sig_p1e10 files from: ", SIG_DIR)
 
-# Read FDR-strict significant pairs for both tools and cohorts
 sig_raw <- list()
 for (tool in TOOLS) {
   sig_raw[[tool]] <- list()
@@ -281,7 +279,6 @@ for (tool in TOOLS) {
       next
     }
     dt <- fread(fname, showProgress = FALSE)
-    # Ensure snp and site IDs are character to prevent integer-vs-character merge issues
     if ("snp"  %in% names(dt)) dt[, snp  := as.character(snp)]
     if ("site" %in% names(dt)) dt[, site := as.character(site)]
     sig_raw[[tool]][[cohort]] <- dt
@@ -345,7 +342,6 @@ for (cohort in COHORTS) {
     me5 <- sig_raw[["MATRIXEQTL5"]][[cohort]]
 
     empty <- data.table()
-    # Skip if either tool produced no results or lacks required columns
     if (!nrow(g5) || !nrow(me5) ||
         !"context" %in% names(g5) || !"context" %in% names(me5) ||
         !"p_FDR"   %in% names(g5) || !"p_FDR"   %in% names(me5)) {
@@ -369,11 +365,10 @@ for (cohort in COHORTS) {
     g5_keys  <- g5_sub [, .(snp, site, FDR_GENESIS5    = p_FDR)]
     me5_keys <- me5_sub[, .(snp, site, FDR_MATRIXEQTL5 = p_FDR)]
 
-    # Inner join on snp+site: keeps only pairs significant in both tools
     both <- merge(g5_keys, me5_keys, by = c("snp", "site"))
     both[, context := ctx]
 
-    # Attach position columns from GENESIS5 if available (used in downstream tables)
+    # Attach position columns from GENESIS5 if available
     pos_cols <- intersect(c("snp_chr", "snp_pos", "site_chr", "site_pos"),
                           names(g5_sub))
     if (length(pos_cols)) {
@@ -385,18 +380,14 @@ for (cohort in COHORTS) {
     log_msg("  ", cohort, "/", ctx, ": ", nrow(both), " robust pairs | ",
             uniqueN(both$site), " sites | ", uniqueN(both$snp), " SNPs (pair-level)")
 
-    # Position-based robust set: positions significant in BOTH tools.
-    # Using va_map (snp_variant_annot.rds) as ground-truth coordinates because
-    # GENESIS snp_pos uses a GDS-internal coordinate system that differs from
-    # the true genomic bp positions in the SNP annotation file.
-    g5_pos  <- ids_to_pos(unique(g5_sub$snp),  va_map[[cohort]][[ctx]])
-    me5_pos <- ids_to_pos(unique(me5_sub$snp), va_map[[cohort]][[ctx]])
-    robust_snp_pos[[cohort]][[ctx]] <- intersect(g5_pos, me5_pos)
+    # Pair-level positions: true genomic positions of SNPs in robust pairs only.
+    # These are used for the Venn diagrams and cross-cohort/context comparisons.
+    robust_snp_pos[[cohort]][[ctx]] <- ids_to_pos(unique(both$snp), va_map[[cohort]][[ctx]])
 
     # Integer-ID robust (kept for pair-level table joins within a single cohort)
-    robust_snps[[cohort]][[ctx]] <- intersect(unique(g5_sub$snp), unique(me5_sub$snp))
+    robust_snps[[cohort]][[ctx]] <- unique(both$snp)
     log_msg("  ", cohort, "/", ctx, ": ",
-            length(robust_snps[[cohort]][[ctx]]), " SNPs (SNP-level robust) | ",
+            length(robust_snps[[cohort]][[ctx]]), " unique SNPs (pair-level) | ",
             length(robust_snp_pos[[cohort]][[ctx]]), " unique positions")
   }
 }
@@ -404,7 +395,7 @@ for (cohort in COHORTS) {
 ############################################################
 # 6) SUPPLEMENTARY — 6 Venns: GENESIS5 vs MatrixEQTL5 per cohort × context
 #    Panel labels a)–f): BREEDING (a–c), NATURAL (d–f)
-#    Unit: methylation sites
+#    Unit: unique genomic positions (SNP chr:pos)
 ############################################################
 
 # Storage for panel assembly (populated in sections 6-8)
@@ -414,7 +405,6 @@ ctx_plots    <- list()   # 2 context-comparison Venns (key = cohort)
 
 log_msg("--- Supplementary: tool comparison (6 Venns) ---")
 
-# Helper to extract unique sites for a given context from a results table
 get_sites <- function(dt, ctx) {
   if (!nrow(dt) || !"context" %in% names(dt)) return(character(0))
   unique(dt[context == ctx, site])
@@ -426,27 +416,44 @@ for (cohort in COHORTS) {
     lbl <- SUPP_LABELS[[key]]
     log_msg("  Panel ", lbl, "  [", cohort, " / ", ctx, "]")
 
-    # Supplementary Venns: unit = unique genomic positions (chr:pos) via va_map.
-    # Convert each tool's significant integer IDs to true genomic positions using
-    # snp_variant_annot.rds — the ground-truth coordinate for this cohort x context.
+    # Supplementary Venns: pair-level SNP counts.
+    # The intersection shown = SNPs targeting the SAME methylation site in both tools
+    # (robust pair-level), NOT just the SNP-level set intersection.
+    # We construct synthetic integer sets so ggvenn computes the correct counts:
+    #   set_A (GENESIS5)    : |A| = n_g5,  |A ∩ B| = n_rob
+    #   set_B (MatrixEQTL5) : |B| = n_me5, |A ∩ B| = n_rob
+    # robust IDs = 1..n_rob; G5-only = (n_rob+1)..(n_rob+n_g5_only)
+    # ME5-only starts after G5-only to guarantee G5-only ∩ ME5-only = ∅
     g5_sub_ctx  <- sig_raw[["GENESIS5"   ]][[cohort]]
     me5_sub_ctx <- sig_raw[["MATRIXEQTL5"]][[cohort]]
     if ("context" %in% names(g5_sub_ctx))  g5_sub_ctx  <- g5_sub_ctx [context == ctx]
     if ("context" %in% names(me5_sub_ctx)) me5_sub_ctx <- me5_sub_ctx[context == ctx]
 
-    g5_snps  <- ids_to_pos(unique(g5_sub_ctx$snp),  va_map[[cohort]][[ctx]])
-    me5_snps <- ids_to_pos(unique(me5_sub_ctx$snp), va_map[[cohort]][[ctx]])
+    n_g5  <- uniqueN(g5_sub_ctx$snp)
+    n_me5 <- uniqueN(me5_sub_ctx$snp)
+    n_rob <- uniqueN(robust[[cohort]][[ctx]]$snp)
+    n_g5_only  <- max(0L, n_g5  - n_rob)
+    n_me5_only <- max(0L, n_me5 - n_rob)
+
+    set_a <- seq_len(n_rob + n_g5_only)
+    set_b <- c(seq_len(n_rob), seq_len(n_me5_only) + n_rob + n_g5_only)
 
     set_list <- list()
-    if (length(g5_snps))  set_list[["GENESIS5"]]    <- g5_snps
-    if (length(me5_snps)) set_list[["MATRIXEQTL5"]] <- me5_snps
+    if (n_g5  > 0L) set_list[["GENESIS5"]]    <- set_a
+    if (n_me5 > 0L) set_list[["MATRIXEQTL5"]] <- set_b
 
-    base <- file.path(SUPP_DIR,
-      paste0("venn_tools_", tolower(cohort), "_", tolower(ctx), "_corrected"))
+    log_msg("  Pair-level counts — G5: ", n_g5, " | ME5: ", n_me5,
+            " | Robust: ", n_rob)
+
+    base      <- file.path(SUPP_DIR,
+      paste0("venn_tools_", tolower(cohort), "_", tolower(ctx)))
+    base_corr <- file.path(CORRECTED_DIR,
+      paste0("venn_tools_", tolower(cohort), "_", tolower(ctx)))
 
     gg <- draw_venn(set_list, SUPP_FILL_COLORS[[key]], lbl, sname_size = 5.5)
     supp_plots[[key]] <- gg
-    save_plot(gg, base, width_cm = 18, height_cm = 12)
+    save_plot(gg, base,      width_cm = 18, height_cm = 12)
+    save_plot(gg, base_corr, width_cm = 18, height_cm = 12)
   }
 }
 
@@ -461,7 +468,6 @@ for (ctx in CONTEXTS) {
   lbl <- CTX_PANEL_LABELS[[ctx]]
   log_msg("  Panel ", lbl, "  [", ctx, "]")
 
-  # Robust SNPs per cohort: markers detected by both tools in the same cohort
   breed_snps   <- robust_snp_pos[["BREEDING"]][[ctx]]
   natural_snps <- robust_snp_pos[["NATURAL" ]][[ctx]]
 
@@ -469,11 +475,13 @@ for (ctx in CONTEXTS) {
   if (length(breed_snps))   set_list[["BREEDING"]] <- breed_snps
   if (length(natural_snps)) set_list[["NATURAL"]]  <- natural_snps
 
-  base <- file.path(MAIN_DIR, paste0("venn_cohorts_", tolower(ctx), "_corrected"))
+  base      <- file.path(MAIN_DIR,      paste0("venn_cohorts_", tolower(ctx)))
+  base_corr <- file.path(CORRECTED_DIR, paste0("venn_cohorts_", tolower(ctx)))
 
   gg <- draw_venn(set_list, COHORT_FILL_COLORS[[ctx]], lbl, sname_size = 5.5)
   cohort_plots[[ctx]] <- gg
-  save_plot(gg, base, width_cm = 14, height_cm = 10)
+  save_plot(gg, base,      width_cm = 14, height_cm = 10)
+  save_plot(gg, base_corr, width_cm = 14, height_cm = 10)
 }
 
 ############################################################
@@ -487,23 +495,65 @@ for (cohort in COHORTS) {
   lbl <- COHORT_PANEL_LABELS[[cohort]]
   log_msg("  Panel ", lbl, "  [", cohort, "]")
 
-  # Compare robust SNP positions across the three cytosine contexts within each cohort
   snp_sets <- list()
   for (ctx in CONTEXTS) {
     snps <- robust_snp_pos[[cohort]][[ctx]]
     if (length(snps)) snp_sets[[ctx]] <- snps
   }
 
-  base <- file.path(MAIN_DIR, paste0("venn_contexts_", tolower(cohort), "_corrected"))
+  base      <- file.path(MAIN_DIR,      paste0("venn_contexts_", tolower(cohort)))
+  base_corr <- file.path(CORRECTED_DIR, paste0("venn_contexts_", tolower(cohort)))
 
   gg <- draw_venn(snp_sets, CTX_FILL_COLORS[[cohort]], lbl)
   ctx_plots[[cohort]] <- gg
-  save_plot(gg, base, width_cm = 21, height_cm = 14)
+  save_plot(gg, base,      width_cm = 21, height_cm = 14)
+  save_plot(gg, base_corr, width_cm = 21, height_cm = 14)
 }
 
 ############################################################
-# 8b) PANEL ASSEMBLY — removed; all 11 Venns saved individually above
+# 8b) PANEL ASSEMBLY
+#   Figure7 : row1 = ctx_plots (A,B — context comparison per cohort)
+#             row2 = cohort_plots (C,D,E — cohort comparison per context)
+#   SuppFig5: 2×3 grid, GENESIS5 vs MatrixEQTL5 per cohort×context
 ############################################################
+
+log_msg("--- Panel assembly ---")
+
+row1_valid <- Filter(Negate(is.null), ctx_plots)
+row2_valid <- Filter(Negate(is.null), cohort_plots)
+
+if (length(row1_valid) >= 1 && length(row2_valid) >= 1) {
+  row1 <- Reduce(`+`, row1_valid) + plot_layout(ncol = length(row1_valid))
+  row2 <- Reduce(`+`, row2_valid) + plot_layout(ncol = length(row2_valid))
+  fig7 <- row1 / row2 + plot_layout(heights = c(1, 1))
+  save_plot(fig7,
+            file.path(PANEL_DIR, "Figure7_Venn_contexts_cohorts_panel"),
+            width_cm = 42, height_cm = 28)
+  save_plot(fig7,
+            file.path(CORRECTED_DIR, "Figure7_Venn_contexts_cohorts_panel"),
+            width_cm = 42, height_cm = 28)
+  log_msg("  Figure7 panel saved → ", PANEL_DIR, " and ", CORRECTED_DIR)
+} else {
+  log_msg("  WARNING: insufficient Venn plots for Figure7 panel")
+}
+
+row1s <- Filter(Negate(is.null), supp_plots[paste0("BREEDING_", CONTEXTS)])
+row2s <- Filter(Negate(is.null), supp_plots[paste0("NATURAL_",  CONTEXTS)])
+
+if (length(row1s) >= 1 && length(row2s) >= 1) {
+  row1 <- Reduce(`+`, row1s) + plot_layout(ncol = 3)
+  row2 <- Reduce(`+`, row2s) + plot_layout(ncol = 3)
+  fs5  <- row1 / row2 + plot_layout(heights = c(1, 1))
+  save_plot(fs5,
+            file.path(PANEL_DIR, "SuppFig5_Venn_tools_panel"),
+            width_cm = 54, height_cm = 24)
+  save_plot(fs5,
+            file.path(CORRECTED_DIR, "SuppFig5_Venn_tools_panel"),
+            width_cm = 54, height_cm = 24)
+  log_msg("  SuppFig5 panel saved → ", PANEL_DIR, " and ", CORRECTED_DIR)
+} else {
+  log_msg("  WARNING: insufficient Venn plots for SuppFig5 panel")
+}
 
 ############################################################
 # 9) TABLES — one per cohort, robust pairs, all contexts combined
@@ -512,7 +562,6 @@ for (cohort in COHORTS) {
 log_msg("--- Saving robust marker tables ---")
 
 for (cohort in COHORTS) {
-  # Combine all three context-level robust pair tables for this cohort
   rows <- lapply(CONTEXTS, function(ctx) robust[[cohort]][[ctx]])
   rows <- rows[sapply(rows, nrow) > 0]
 
@@ -522,7 +571,6 @@ for (cohort in COHORTS) {
   }
 
   tab <- rbindlist(rows, fill = TRUE)
-  # Standardise column order: identifiers, then positions, then FDR values
   col_order <- intersect(
     c("snp", "snp_chr", "snp_pos", "site", "site_chr", "site_pos",
       "context", "FDR_GENESIS5", "FDR_MATRIXEQTL5"),
@@ -543,8 +591,6 @@ for (cohort in COHORTS) {
 
 log_msg("--- Saving robust context summary ---")
 
-# Distinguish pair-level SNPs (same snp+site in both tools) from SNP-level
-# (same SNP in either tool, regardless of associated site) for reporting
 rob_ctx_rows <- list()
 for (cohort in COHORTS) {
   for (ctx in CONTEXTS) {

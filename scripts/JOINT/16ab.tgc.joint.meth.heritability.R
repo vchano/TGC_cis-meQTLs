@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 ############################################################
 # TreeGeneClimate (TGC) — JOINT ECS + TMS
-# Step 16ab7: Per-site methylation heritability
+# Step 16ab: Per-site methylation heritability
 #
 # Estimates SNP-based heritability (h²_SNP) at every
 # MEF-retained cytosine site using per-site GREML via
@@ -43,7 +43,6 @@ suppressPackageStartupMessages({
 
 options(stringsAsFactors = FALSE)
 
-# === USER CONFIGURATION ===
 # === USER CONFIGURATION ===
 # Set TGC_PROJECT_ROOT as an environment variable, or edit the fallback path below
 PROJECT_ROOT <- Sys.getenv("TGC_PROJECT_ROOT",
@@ -295,4 +294,4 @@ if (nrow(breed_h2) > 0) {
   msg("Skipping GRM-vs-pedigree figure (no breeding pedigree data)")
 }
 
-msg("Step 16ab7 complete. Outputs in: ", H2_ROOT)
+msg("Step 16ab complete. Outputs in: ", H2_ROOT)

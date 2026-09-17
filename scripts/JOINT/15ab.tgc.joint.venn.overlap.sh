@@ -28,7 +28,7 @@
 #SBATCH -N 1
 #SBATCH -c 1
 #SBATCH --mem=8G
-#SBATCH --job-name=TGC.overlap16
+#SBATCH --job-name=TGC.15ab
 #SBATCH --output=/path/to/your/project/LOGS/%x_%j.out
 #SBATCH --error=/path/to/your/project/LOGS/%x_%j.err
 #SBATCH --mail-type=BEGIN,END,FAIL
@@ -46,7 +46,7 @@ module load r/4.5.2
 export LC_ALL=C.UTF-8
 export LANG=C.UTF-8
 # export R_LIBS_USER="/path/to/your/Rlibs"  # uncomment and set if needed
-mkdir -p "${R_LIBS_USER}"
+[ -n "${R_LIBS_USER:-}" ] && mkdir -p "${R_LIBS_USER}"
 
 # ---------------------------------------------------------------------------
 # Install missing R packages (idempotent)

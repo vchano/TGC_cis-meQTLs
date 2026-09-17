@@ -1,7 +1,8 @@
 #!/usr/bin/env Rscript
 ############################################################
 # TreeGeneClimate (TGC) — JOINT ECS + TMS
-# Step 13ab: Combined results — comprehensive summary, QQ plots, sig-site tables
+# Step 13ab: Combined results — comprehensive summary, QQ plots, sig-site tables,
+#             and robust SNP-methylation pair identification
 #
 # PURPOSE
 # Reads cis-meQTL results from GENESIS5 and MatrixEQTL5, produces:
@@ -9,6 +10,8 @@
 #   - QQ plots (one per panel x tool, 12 total, TIFF)
 #   - Long-format site FDR table (site, site_chr, context, min_FDR)
 #   - Significant site lists (p_FDR < 5e-8 and p_FDR < 1e-10)
+#   - Robust pairs (FDR < 1e-10 in BOTH tools) with true genomic coordinates
+#   - Supplementary Table S5 xlsx
 #
 # SIGNIFICANCE THRESHOLDS (BH-adjusted p-values):
 #   FDR_LOOSE  = 5e-8
@@ -28,10 +31,14 @@
 #   tables/all_sites_<tool>_<cohort>.tsv   — long format: site, site_chr, context, min_FDR
 #   sig_sites/sig_p5e8_<tool>_<cohort>.tsv
 #   sig_sites/sig_p1e10_<tool>_<cohort>.tsv
+#   overlap/tables/robust_markers_<cohort>.tsv
+#   overlap/tables/robust_context_summary.tsv
+#   tables/supplementary_table_s5.xlsx
 ############################################################
 
 suppressPackageStartupMessages({
   library(data.table)
+  library(openxlsx2)
 })
 
 options(stringsAsFactors = FALSE)
@@ -70,7 +77,9 @@ OUT_ROOT <- file.path(PROJECT_ROOT, "RESULTS", "JOINT", "COMBINED5")
 QQ_DIR   <- file.path(OUT_ROOT, "qq")
 TAB_DIR  <- file.path(OUT_ROOT, "tables")
 SIG_DIR  <- file.path(OUT_ROOT, "sig_sites")
-for (d in c(OUT_ROOT, QQ_DIR, TAB_DIR, SIG_DIR))
+ROBUST_DIR <- file.path(OUT_ROOT, "overlap", "tables")
+S5_PATH    <- file.path(TAB_DIR, "supplementary_table_s5.xlsx")
+for (d in c(OUT_ROOT, QQ_DIR, TAB_DIR, SIG_DIR, ROBUST_DIR))
   dir.create(d, recursive = TRUE, showWarnings = FALSE)
 
 ############################################################
@@ -263,7 +272,7 @@ for (tool in TOOLS) {
         draw_qq(); dev.off()
         # EPS and PNG skipped: EPS OOMs on large natural-context datasets (>1 GB vector
         # file); PNG render of millions of scatter points is prohibitively slow.
-        # 16ab.R only needs the TIFF; 19ab exports PDF from native source.
+        # 14ab only needs the TIFF; 19ab exports PDF from native source.
       }
 
       # Significant-site tables (all SNP-site pairs passing threshold)
@@ -327,6 +336,138 @@ print(summary_dt[status == "ok",
                  .(tool, cohort, context, cis_window_kb,
                    n_pairs, n_sites_tested, n_snps_tested,
                    n_sig_pairs_p1e10, n_sig_sites_p1e10, n_sig_snps_p1e10, lambda)])
+
+msg("Comprehensive summary and sig-site tables done. Starting robust pair identification...")
+
+############################################################
+# 6) ROBUST PAIRS
+#    A pair is robust when the same snp+site combination passes
+#    FDR < 1e-10 independently in BOTH GENESIS5 and MatrixEQTL5.
+#    SNP positions are taken from snp_variant_annot.rds (true genomic
+#    bp coordinates), not from GDS-internal sequential indices.
+#    Site positions are parsed from the site string (PA_chrXX:start-end).
+############################################################
+
+msg("Loading SNP position annotation maps for robust pair identification...")
+
+snp_annot <- list()
+for (cohort in COHORTS) {
+  snp_annot[[cohort]] <- list()
+  for (ctx in CONTEXTS) {
+    va_path <- file.path(ANNOT_ROOT, cohort, ctx, "snp_variant_annot.rds")
+    if (file.exists(va_path)) {
+      va <- as.data.table(readRDS(va_path))
+      snp_annot[[cohort]][[ctx]] <- va[, .(snp_id = as.integer(snp_id),
+                                           snp_chr = as.character(chr),
+                                           snp_pos = as.integer(pos))]
+    } else {
+      msg("  MISSING SNP annot: ", va_path)
+      snp_annot[[cohort]][[ctx]] <- data.table()
+    }
+  }
+}
+
+robust_list    <- list()
+robust_summary <- list()
+
+for (cohort in COHORTS) {
+  for (ctx in CONTEXTS) {
+    key_g5  <- paste("GENESIS5",    paste0(tolower(cohort), "_", tolower(ctx)))
+    key_me5 <- paste("MATRIXEQTL5", paste0(tolower(cohort), "_", tolower(ctx)))
+    g5_dt   <- sig_strict_list[[key_g5]]
+    me5_dt  <- sig_strict_list[[key_me5]]
+
+    if (is.null(g5_dt) || !nrow(g5_dt) || is.null(me5_dt) || !nrow(me5_dt)) {
+      msg("  ", cohort, "/", ctx, ": one tool has 0 pairs — skipping robust")
+      next
+    }
+
+    keep_cols <- c("snp", "site", "statistic", "beta", "pvalue", "p_FDR")
+    g5_keep  <- intersect(keep_cols, names(g5_dt))
+    me5_keep <- intersect(keep_cols, names(me5_dt))
+    g5_sub   <- g5_dt [, ..g5_keep]
+    me5_sub  <- me5_dt[, ..me5_keep]
+
+    setnames(g5_sub,  setdiff(g5_keep,  c("snp","site")),
+             paste0(setdiff(g5_keep,  c("snp","site")), "_GENESIS5"))
+    setnames(me5_sub, setdiff(me5_keep, c("snp","site")),
+             paste0(setdiff(me5_keep, c("snp","site")), "_MATRIXEQTL5"))
+
+    both <- merge(g5_sub, me5_sub, by = c("snp", "site"))
+    both[, context := ctx]
+    both[, cohort  := cohort]
+
+    sa <- snp_annot[[cohort]][[ctx]]
+    if (nrow(sa))
+      both <- merge(both, sa, by.x = "snp", by.y = "snp_id", all.x = TRUE)
+    else
+      both[, `:=`(snp_chr = NA_character_, snp_pos = NA_integer_)]
+
+    both[, site_chr := sub(":.*", "", site)]
+    both[, site_pos := as.integer(sub("^[^:]+:(\\d+)-.*$", "\\1", site))]
+
+    n_pairs <- nrow(both)
+    n_snps  <- uniqueN(both$snp)
+    n_sites <- uniqueN(both$site)
+    msg("  ", cohort, "/", ctx, ": ", n_pairs, " robust pairs | ",
+        n_snps, " unique SNPs | ", n_sites, " unique sites")
+
+    robust_list[[paste0(cohort, "_", ctx)]] <- both
+    robust_summary[[length(robust_summary) + 1]] <- data.table(
+      cohort = cohort, context = ctx,
+      robust_pairs        = n_pairs,
+      robust_unique_snps  = n_snps,
+      robust_unique_sites = n_sites
+    )
+  }
+}
+
+robust_dt         <- rbindlist(robust_list, fill = TRUE)
+robust_summary_dt <- rbindlist(robust_summary)
+
+col_order <- c("cohort", "context",
+               "snp", "snp_chr", "snp_pos",
+               "site", "site_chr", "site_pos",
+               grep("_GENESIS5$",    names(robust_dt), value = TRUE),
+               grep("_MATRIXEQTL5$", names(robust_dt), value = TRUE))
+setcolorder(robust_dt, intersect(col_order, names(robust_dt)))
+
+for (coh in COHORTS) {
+  sub <- robust_dt[cohort == coh]
+  out <- file.path(ROBUST_DIR, paste0("robust_markers_", tolower(coh), ".tsv"))
+  fwrite(sub, out, sep = "\t")
+  msg("  Saved: ", basename(out), " (", nrow(sub), " rows)")
+}
+fwrite(robust_summary_dt,
+       file.path(ROBUST_DIR, "robust_context_summary.tsv"), sep = "\t")
+msg("  Robust summary saved.")
+
+############################################################
+# 7) WRITE SUPPLEMENTARY TABLE S5 XLSX
+############################################################
+
+msg("Writing Supplementary Table S5...")
+
+s5_export <- copy(robust_dt)
+setnames(s5_export,
+  old = c("p_FDR_GENESIS5", "p_FDR_MATRIXEQTL5"),
+  new = c("FDR_GENESIS5",   "FDR_MATRIXEQTL5"),
+  skip_absent = TRUE)
+
+wb <- wb_workbook()
+wb <- wb_add_worksheet(wb, "Supplementary Table S5")
+wb <- wb_add_data(wb, sheet = "Supplementary Table S5",
+  x = "Supplementary Table S5. Robust cis-meQTL pairs (FDR < 1e-10 in both GENESIS5 and MatrixEQTL5).",
+  start_row = 1, start_col = 1, col_names = FALSE)
+wb <- wb_add_data(wb, sheet = "Supplementary Table S5",
+  x = paste0("snp_pos: true genomic bp position from snp_variant_annot.rds. ",
+             "site_chr and site_pos: parsed from site string (chr:start-end). ",
+             "Pair-level robust: same snp+site significant in both tools."),
+  start_row = 2, start_col = 1, col_names = FALSE)
+wb <- wb_add_data(wb, sheet = "Supplementary Table S5",
+  x = as.data.frame(s5_export), start_row = 3, start_col = 1, col_names = TRUE)
+wb_save(wb, S5_PATH)
+msg("  Table S5 saved: ", S5_PATH, " (", nrow(s5_export), " rows)")
 
 msg("Step 13ab finished. Outputs: ", OUT_ROOT)
 

@@ -3,6 +3,7 @@
 # TreeGeneClimate (TGC) — JOINT ECS + TBS
 # Step 14ab: Circular Manhattan plots (GENESIS5 + MatrixEQTL5)
 #            Version 5 — 18 cm canvas, BH-FDR axis option
+#            + Combined 2-panel figures (BREEDING | NATURAL + legend)
 #
 # PURPOSE
 # Produces circular Manhattan plots from cis-meQTL results (meQTL5 run).
@@ -21,7 +22,7 @@
 #
 # USAGE
 #   Rscript --vanilla 14ab.tgc.joint.manhattan.plots.R
-#   # or source from 16ab with: SOURCED_14AB <- TRUE; FDR_AXIS <- FALSE
+#   # or source from another script: SOURCED_14AB <- TRUE; source("14ab.R")
 #
 # INPUTS
 #   RESULTS/JOINT/GENESIS5/MEQTL/<COHORT>/<CONTEXT>/cis_meqtl_all_results.rds
@@ -35,6 +36,11 @@
 #   manhattan_circular_<tool>_<cohort>_5fdr.{tiff,pdf,svg,eps}   -- BH-FDR axis
 #   legend_circular_5.tiff      (36 cm, for 2-panel combined figure)
 #   legend_circular_5_wide.tiff (72 cm, for 4-panel comparison)
+# OUTPUTS (RESULTS/JOINT/COMBINED5/panels/)
+#   Figure3_circular_panel_genesis5_5.{tiff,pdf,svg,png,eps}
+#   EDF4_circular_panel_matrixeqtl5_5.{tiff,pdf,svg,png,eps}
+#   Figure3_circular_panel_genesis5_5_FDR.{tiff,pdf,svg,png,eps}
+#   EDF4_circular_panel_matrixeqtl5_5_FDR.{tiff,pdf,svg,png,eps}
 ############################################################
 
 suppressPackageStartupMessages({
@@ -69,6 +75,11 @@ TRACK_HEIGHT      <- 0.25
 POINT_PALETTE     <- "Set1"
 CHR_LABEL_CEX     <- 1.02    # 1.20 * 0.85 — reduced 15% to prevent "Un" clipping
 
+# Combined panel dimensions (BREEDING | NATURAL side-by-side + legend strip)
+LEG_H_CM  <- 2.0                          # legend strip height
+COMB_W_CM <- OUT_W_CM * 2                 # 36 cm total width
+COMB_H_CM <- OUT_W_CM + LEG_H_CM          # 20 cm total height
+
 ############################################################
 # 2) PATHS  -- set PROJECT_ROOT and RDATA_DIR to your paths
 ############################################################
@@ -86,16 +97,18 @@ RESULT_ROOTS <- list(
 
 ANNOT_ROOT <- file.path(PROJECT_ROOT, "RESULTS", "JOINT", "MQTL5", "INPUTS")
 
-OUT_MAN <- file.path(PROJECT_ROOT, "RESULTS", "JOINT", "COMBINED5", "manhattan")
-LOG_DIR <- file.path(PROJECT_ROOT, "RESULTS", "JOINT", "COMBINED5", "LOGS")
-dir.create(OUT_MAN, recursive = TRUE, showWarnings = FALSE)
-dir.create(LOG_DIR, recursive = TRUE, showWarnings = FALSE)
+OUT_MAN       <- file.path(PROJECT_ROOT, "RESULTS", "JOINT", "COMBINED5", "manhattan")
+PANEL_DIR     <- file.path(PROJECT_ROOT, "RESULTS", "JOINT", "COMBINED5", "panels")
+CORRECTED_DIR <- file.path(PROJECT_ROOT, "RESULTS", "CORRECTED", "FIGURES", "NEW")
+LOG_DIR       <- file.path(PROJECT_ROOT, "RESULTS", "JOINT", "COMBINED5", "LOGS")
+for (d in c(OUT_MAN, PANEL_DIR, CORRECTED_DIR, LOG_DIR))
+  dir.create(d, recursive = TRUE, showWarnings = FALSE)
 
 LOGFILE <- file.path(LOG_DIR, "step14ab.log")
 if (file.exists(LOGFILE)) file.remove(LOGFILE)
 
-# Directory containing breeding.snp.gds and natural.snp.gds
-RDATA_DIR <- "/path/to/your/RDATA"        # <-- set this
+# GDS files are in the ECS RDATA directory produced by step 12ab0
+RDATA_DIR <- file.path(PROJECT_ROOT, "RESULTS", "ECS", "RANALYSIS", "RDATA")
 GDS_FILES <- list(
   BREEDING = file.path(RDATA_DIR, "breeding.snp.gds"),
   NATURAL  = file.path(RDATA_DIR, "natural.snp.gds")
@@ -113,6 +126,20 @@ log_msg <- function(...) {
   cat(txt, "\n", file = LOGFILE, append = TRUE)
 }
 sep_line <- function() log_msg(paste(rep("=", 70), collapse = ""))
+
+MAGICK_BIN <- Sys.which("magick")
+if (!nzchar(MAGICK_BIN)) MAGICK_BIN <- Sys.which("convert")
+HAS_MAGICK <- nzchar(MAGICK_BIN)
+
+run_magick <- function(args_str) {
+  cmd <- paste(shQuote(MAGICK_BIN), args_str)
+  ret <- system(cmd, ignore.stdout = TRUE, ignore.stderr = FALSE)
+  if (ret != 0L) stop("magick failed:\n  ", cmd)
+}
+
+check_nonempty <- function(path, min_bytes = 5000L) {
+  file.exists(path) && file.info(path)$size >= min_bytes
+}
 
 pval_column <- function(res_dt) {
   candidates <- c("pvalue", "pval", "Score.pval",
@@ -481,7 +508,7 @@ draw_circular_manhattan <- function(dat, tool, cohort, out_path = NULL,
 # 6) BUILD CHROMOSOME LAYOUT
 ############################################################
 
-# Guard: skip main loop when sourced by 16ab.tgc.joint.panel.assembly.R
+# Guard: skip main loop when sourced by another script (functions defined above remain available)
 if (!exists("SOURCED_14AB") || !isTRUE(SOURCED_14AB)) {
 
 sep_line()
@@ -573,7 +600,144 @@ writeLines(capture.output(sessionInfo()),
            file.path(LOG_DIR, "step14ab_sessionInfo.txt"))
 
 sep_line()
-log_msg("Step 14ab finished -- plots saved to: ", OUT_MAN)
+log_msg("Individual plots done. Building combined panels...")
+
+############################################################
+# 9) DRAW COMBINED PANELS (BREEDING | NATURAL + legend)
+############################################################
+
+# Logfile already opened above (step14ab.log)
+if (HAS_MAGICK) log_msg("ImageMagick: ", MAGICK_BIN) else
+  log_msg("WARNING: ImageMagick not found — TIFF/PNG/EPS combined panels skipped")
+
+ctx_colors_combined <- ctx_colors_global   # alias; defined in section 8
+
+draw_combined_panel <- function(tool, out_base, fdr_mode) {
+
+  FDR_AXIS <<- fdr_mode
+  axis_tag  <- if (fdr_mode) "_5fdr" else "_5"
+
+  log_msg("  Loading data: ", tool, " BREEDING + NATURAL [FDR_AXIS=", fdr_mode, "]")
+  dat_b <- load_panel_data(tool, "BREEDING")
+  dat_n <- load_panel_data(tool, "NATURAL")
+
+  draw_both <- function(dev_open_fn) {
+    dev_open_fn()
+    on.exit(dev.off(), add = TRUE)
+    layout(matrix(c(1L, 2L, 3L, 3L), nrow = 2L, byrow = TRUE),
+           widths  = lcm(c(OUT_W_CM, OUT_W_CM)),
+           heights = lcm(c(OUT_W_CM, LEG_H_CM)))
+    draw_circular_manhattan(dat_b, tool, "BREEDING",
+                            open_device = FALSE, label_cex = 2.80)
+    draw_circular_manhattan(dat_n, tool, "NATURAL",
+                            open_device = FALSE, label_cex = 2.80)
+    par(mar = c(0, 0, 0, 0))
+    plot.new()
+    plot.window(xlim = c(0, 1), ylim = c(0, 1))
+    legend("center", legend = CTX_ORDER, pch = 16, col = ctx_colors_combined,
+           pt.cex = 2.0, cex = 1.5, horiz = TRUE, bty = "n", x.intersp = 1.2)
+  }
+
+  # PDF (cairo_pdf — vectorized)
+  pdf_out <- paste0(out_base, ".pdf")
+  log_msg("  Drawing PDF: ", basename(pdf_out))
+  tryCatch(
+    draw_both(function()
+      cairo_pdf(pdf_out, width = COMB_W_CM / 2.54, height = COMB_H_CM / 2.54)),
+    error = function(e) log_msg("  ERROR (pdf): ", conditionMessage(e))
+  )
+  if (check_nonempty(pdf_out)) log_msg("  PDF OK (", file.info(pdf_out)$size, " bytes)") else
+    log_msg("  WARNING: PDF may be empty")
+
+  # SVG (vectorized)
+  svg_out <- paste0(out_base, ".svg")
+  log_msg("  Drawing SVG: ", basename(svg_out))
+  tryCatch(
+    draw_both(function()
+      svg(svg_out, width = COMB_W_CM / 2.54, height = COMB_H_CM / 2.54)),
+    error = function(e) log_msg("  ERROR (svg): ", conditionMessage(e))
+  )
+  if (check_nonempty(svg_out)) log_msg("  SVG OK (", file.info(svg_out)$size, " bytes)") else
+    log_msg("  WARNING: SVG may be empty")
+
+  # TIFF (ImageMagick — stitch from individual per-cohort TIFFs)
+  if (HAS_MAGICK) {
+    tool_l  <- tolower(tool)
+    img_b   <- file.path(OUT_MAN,
+                 sprintf("manhattan_circular_%s_breeding%s.tiff", tool_l, axis_tag))
+    img_n   <- file.path(OUT_MAN,
+                 sprintf("manhattan_circular_%s_natural%s.tiff",  tool_l, axis_tag))
+    leg_tif <- file.path(OUT_MAN, "legend_circular_5.tiff")
+
+    if (all(file.exists(img_b, img_n, leg_tif))) {
+      TMP      <- file.path(PANEL_DIR, ".tmp14ab")
+      dir.create(TMP, recursive = TRUE, showWarnings = FALSE)
+      pair_tmp <- file.path(TMP, sprintf("%s%s_circs.tiff", tool_l, axis_tag))
+      run_magick(paste(shQuote(img_b), shQuote(img_n),
+                       "+append -compress lzw", shQuote(pair_tmp)))
+      tiff_out <- paste0(out_base, ".tiff")
+      run_magick(paste(shQuote(pair_tmp), shQuote(leg_tif),
+                       "-append -compress lzw", shQuote(tiff_out)))
+      log_msg("  TIFF assembled: ", file.info(tiff_out)$size, " bytes")
+      png_out <- paste0(out_base, ".png")
+      run_magick(paste("-density 150", shQuote(tiff_out), shQuote(png_out)))
+      log_msg("  PNG: ", basename(png_out))
+      eps_out <- paste0(out_base, ".eps")
+      run_magick(paste("-density 300", shQuote(tiff_out), shQuote(eps_out)))
+      log_msg("  EPS: ", basename(eps_out))
+      unlink(TMP, recursive = TRUE)
+    } else {
+      log_msg("  WARNING: individual TIFFs missing — TIFF/PNG/EPS skipped")
+    }
+  }
+
+  invisible(out_base)
+}
+
+figure_specs <- list(
+  list(tool = "GENESIS5",    fdr = FALSE,
+       stem = "Figure3_circular_panel_genesis5_5"),
+  list(tool = "MATRIXEQTL5", fdr = FALSE,
+       stem = "EDF4_circular_panel_matrixeqtl5_5"),
+  list(tool = "GENESIS5",    fdr = TRUE,
+       stem = "Figure3_circular_panel_genesis5_5_FDR"),
+  list(tool = "MATRIXEQTL5", fdr = TRUE,
+       stem = "EDF4_circular_panel_matrixeqtl5_5_FDR")
+)
+
+for (spec in figure_specs) {
+  sep_line()
+  log_msg("Panel: ", spec$stem)
+  draw_combined_panel(spec$tool,
+                      file.path(PANEL_DIR, spec$stem),
+                      spec$fdr)
+}
+
+############################################################
+# 10) COPY COMBINED PANELS TO CORRECTED/FIGURES/NEW
+############################################################
+
+sep_line()
+log_msg("Copying combined panels to CORRECTED/FIGURES/NEW...")
+copy_fmts <- c("tiff", "pdf", "svg", "png", "eps")
+for (spec in figure_specs) {
+  for (fmt in copy_fmts) {
+    src_f <- file.path(PANEL_DIR, paste0(spec$stem, ".", fmt))
+    dst_f <- file.path(CORRECTED_DIR, paste0(fmt, "_", spec$stem, ".", fmt))
+    if (file.exists(src_f) && file.info(src_f)$size > 0) {
+      file.copy(src_f, dst_f, overwrite = TRUE)
+      log_msg("  ", basename(dst_f))
+    } else {
+      log_msg("  MISSING/EMPTY (skip): ", basename(src_f))
+    }
+  }
+}
+
+sep_line()
+log_msg("Step 14ab finished")
+log_msg("  Individual plots : ", OUT_MAN)
+log_msg("  Combined panels  : ", PANEL_DIR)
+log_msg("  Copies           : ", CORRECTED_DIR)
 sep_line()
 
 } # end SOURCED_14AB guard
