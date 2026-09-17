@@ -466,6 +466,24 @@ wb <- wb_add_data(wb, sheet = "Supplementary Table S5",
   start_row = 2, start_col = 1, col_names = FALSE)
 wb <- wb_add_data(wb, sheet = "Supplementary Table S5",
   x = as.data.frame(s5_export), start_row = 3, start_col = 1, col_names = TRUE)
+
+# Force scientific notation with full precision for p-value/FDR columns.
+# Without an explicit number format, Excel's "General" format silently
+# rounds these to ~2-3 significant digits on display (values are all
+# < FDR_STRICT = 1e-10), which reads as "wrong" even though the
+# underlying stored value is correct.
+pval_cols <- grep("^(pvalue|FDR)_", names(s5_export))
+if (length(pval_cols) > 0) {
+  first_row <- 4L                       # data starts after 2 header rows + column-name row
+  last_row  <- 3L + nrow(s5_export)
+  for (ci in pval_cols) {
+    col_letter <- openxlsx2::int2col(ci)
+    dims <- paste0(col_letter, first_row, ":", col_letter, last_row)
+    wb <- wb_add_numfmt(wb, sheet = "Supplementary Table S5",
+                        dims = dims, numfmt = "0.00E+00")
+  }
+}
+
 wb_save(wb, S5_PATH)
 msg("  Table S5 saved: ", S5_PATH, " (", nrow(s5_export), " rows)")
 
