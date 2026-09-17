@@ -73,7 +73,11 @@ CHR_LABEL_CEX     <- 1.02    # 1.20 * 0.85 — reduced 15% to prevent "Un" clipp
 # 2) PATHS  -- set PROJECT_ROOT and RDATA_DIR to your paths
 ############################################################
 
-PROJECT_ROOT <- "/path/to/your/project"   # <-- set this
+# === USER CONFIGURATION ===
+# Set TGC_PROJECT_ROOT as an environment variable, or edit the fallback path below
+PROJECT_ROOT <- Sys.getenv("TGC_PROJECT_ROOT",
+  unset = "/path/to/your/project")
+# ===========================
 
 RESULT_ROOTS <- list(
   GENESIS5    = file.path(PROJECT_ROOT, "RESULTS", "JOINT", "GENESIS5",    "MEQTL"),

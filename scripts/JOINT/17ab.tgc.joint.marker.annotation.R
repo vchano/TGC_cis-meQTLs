@@ -43,7 +43,9 @@ BETA_HYPER <- c(CpG = 0.70, CHG = 0.50, CHH = 0.30)
 ############################################################
 
 # === USER CONFIGURATION ===
-PROJECT_ROOT <- "/path/to/your/project"  # <-- set this
+# Set TGC_PROJECT_ROOT as an environment variable, or edit the fallback path below
+PROJECT_ROOT <- Sys.getenv("TGC_PROJECT_ROOT",
+  unset = "/path/to/your/project")
 # ===========================
 
 # Picea abies v2.0 reference annotation (Nystedt et al. 2013 updated build)

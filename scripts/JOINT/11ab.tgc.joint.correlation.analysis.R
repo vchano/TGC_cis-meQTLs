@@ -27,7 +27,7 @@
 #   DATA/METADATA/natural_sample2pop.txt
 #
 # OUTPUTS
-# - /user/chano/u15584/TGC_project/RESULTS/JOINT/
+# - PROJECT_ROOT/RESULTS/JOINT/
 #     FIGURES/11ab/
 #     TABLES/11ab/
 #
@@ -58,7 +58,9 @@ set.seed(1)
 # 1) FIXED PATHS
 ############################################################
 # === USER CONFIGURATION ===
-PROJECT_ROOT <- "/path/to/your/project"  # <-- set this
+# Set TGC_PROJECT_ROOT as an environment variable, or edit the fallback path below
+PROJECT_ROOT <- Sys.getenv("TGC_PROJECT_ROOT",
+  unset = "/path/to/your/project")
 # ===========================
 
 # ECS (GDS produced by 8a)
@@ -75,7 +77,7 @@ MAP_BREED <- file.path(META_DIR, "breeding_sample2family.txt")
 MAP_NATUR <- file.path(META_DIR, "natural_sample2pop.txt")
 
 # JOINT outputs
-JOINT_ROOT <- "/user/chano/u15584/TGC_project/RESULTS/JOINT"
+JOINT_ROOT <- file.path(PROJECT_ROOT, "RESULTS/JOINT")
 OUT_FIG <- file.path(JOINT_ROOT, "FIGURES", "11ab")
 OUT_TAB <- file.path(JOINT_ROOT, "TABLES",  "11ab")
 OUT_DIAG <- file.path(OUT_TAB, "DIAGNOSE")

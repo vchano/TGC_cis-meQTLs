@@ -116,7 +116,9 @@ OUT_W_2SET <- 20; OUT_H_2SET <- 12   # wider canvas for 2-set horizontal Venns
 ############################################################
 
 # === USER CONFIGURATION ===
-PROJECT_ROOT <- "/path/to/your/project"  # <-- set this
+# Set TGC_PROJECT_ROOT as an environment variable, or edit the fallback path below
+PROJECT_ROOT <- Sys.getenv("TGC_PROJECT_ROOT",
+  unset = "/path/to/your/project")
 # ===========================
 
 # Input: significant pairs at the strict FDR threshold, produced by 13ab.R

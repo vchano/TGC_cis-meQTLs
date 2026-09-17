@@ -56,7 +56,7 @@ export LC_ALL=C.UTF-8
 export LANG=C.UTF-8
 
 # IMPORTANT: point to the library you want SLURM jobs to use
-export R_LIBS_USER="/mnt/vast-standard/home/chano/u15584/Rlibs/4.5.2"
+# export R_LIBS_USER="/path/to/your/Rlibs"  # uncomment and set if needed
 
 # -----------------------------
 # Config

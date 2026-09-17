@@ -50,7 +50,9 @@ DAPC_MISS_MAX <- 0.10
 # 1) PATHS (CEPH-HDD)
 ############################################################
 # === USER CONFIGURATION ===
-PROJECT_ROOT <- "/path/to/your/project"  # <-- set this
+# Set TGC_PROJECT_ROOT as an environment variable, or edit the fallback path below
+PROJECT_ROOT <- Sys.getenv("TGC_PROJECT_ROOT",
+  unset = "/path/to/your/project")
 # ===========================
 
 # Genotypes and population-genetics outputs from the pipeline

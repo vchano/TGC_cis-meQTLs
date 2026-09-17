@@ -77,7 +77,7 @@ dir.create(LOG_DIR, recursive = TRUE, showWarnings = FALSE)
 LOGFILE <- file.path(LOG_DIR, "step16ab4_v5.log")
 if (file.exists(LOGFILE)) file.remove(LOGFILE)
 
-RDATA_DIR <- "/mnt/vast-standard/home/chano/u15584/treegeneclimate/2025/ECS/RDATA"
+RDATA_DIR <- file.path(PROJECT_ROOT, "RESULTS/ECS/RANALYSIS/RDATA")
 GDS_FILES <- list(
   BREEDING = file.path(RDATA_DIR, "breeding.snp.gds"),
   NATURAL  = file.path(RDATA_DIR, "natural.snp.gds")

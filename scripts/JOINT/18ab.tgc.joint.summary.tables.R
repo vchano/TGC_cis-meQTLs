@@ -19,7 +19,9 @@ options(stringsAsFactors = FALSE)
 ############################################################
 
 # === USER CONFIGURATION ===
-PROJECT_ROOT <- "/path/to/your/project"  # <-- set this
+# Set TGC_PROJECT_ROOT as an environment variable, or edit the fallback path below
+PROJECT_ROOT <- Sys.getenv("TGC_PROJECT_ROOT",
+  unset = "/path/to/your/project")
 # ===========================
 COMBINED5    <- file.path(PROJECT_ROOT, "RESULTS", "JOINT", "COMBINED5")
 OUT_DIR      <- file.path(COMBINED5, "tables")

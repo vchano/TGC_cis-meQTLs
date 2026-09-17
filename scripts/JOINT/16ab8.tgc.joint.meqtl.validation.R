@@ -38,8 +38,12 @@ suppressPackageStartupMessages({
 options(stringsAsFactors = FALSE)
 
 # === USER CONFIGURATION ===
-PROJECT_ROOT <- "/path/to/your/project"   # <-- set this
-RDATA_DIR    <- "/path/to/your/rdata"     # directory with GRM .rds and GDS files
+# === USER CONFIGURATION ===
+# Set TGC_PROJECT_ROOT as an environment variable, or edit the fallback path below
+PROJECT_ROOT <- Sys.getenv("TGC_PROJECT_ROOT",
+  unset = "/path/to/your/project")
+# ===========================
+RDATA_DIR    <- file.path(PROJECT_ROOT, "RESULTS/ECS/RANALYSIS/RDATA")  # directory with GRM .rds and GDS files
 # ===========================
 
 COHORTS  <- c("BREEDING", "NATURAL")

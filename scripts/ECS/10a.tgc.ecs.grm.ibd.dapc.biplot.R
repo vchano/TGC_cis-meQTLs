@@ -44,7 +44,9 @@ set.seed(1)  # reproducible DAPC cross-validation and random jitter
 # 1) FIXED OUTPUT LOCATIONS (DO NOT CHANGE)
 # ==============================================================================
 # === USER CONFIGURATION ===
-PROJECT_ROOT <- "/path/to/your/project"  # <-- set this
+# Set TGC_PROJECT_ROOT as an environment variable, or edit the fallback path below
+PROJECT_ROOT <- Sys.getenv("TGC_PROJECT_ROOT",
+  unset = "/path/to/your/project")
 # ===========================
 RANA_DIR     <- file.path(PROJECT_ROOT, "RESULTS/ECS/RANALYSIS")
 RDATA_DIR    <- file.path(RANA_DIR, "RDATA")   # RDS objects written by step 8a

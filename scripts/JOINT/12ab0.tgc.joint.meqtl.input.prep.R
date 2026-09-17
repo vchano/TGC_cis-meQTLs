@@ -55,7 +55,9 @@ CONTEXTS <- c("CpG", "CHG", "CHH")
 ############################################################
 
 # === USER CONFIGURATION ===
-PROJECT_ROOT <- "/path/to/your/project"  # <-- set this
+# Set TGC_PROJECT_ROOT as an environment variable, or edit the fallback path below
+PROJECT_ROOT <- Sys.getenv("TGC_PROJECT_ROOT",
+  unset = "/path/to/your/project")
 # ===========================
 OUTROOT      <- file.path(PROJECT_ROOT, "RESULTS", "JOINT", "MQTL5")
 
@@ -77,7 +79,7 @@ for (f in c(LOGFILE, SUMMARY_FILE, OVERLAP_FILE))
   if (file.exists(f)) file.remove(f)
 
 # --- OLD-STYLE input paths ---
-RDATA_DIR   <- "/mnt/vast-standard/home/chano/u15584/treegeneclimate/2025/ECS/RDATA"
+RDATA_DIR   <- file.path(PROJECT_ROOT, "RESULTS/ECS/RANALYSIS/RDATA")
 TMS_RDS_DIR <- "/scratch-scc/users/u15584/TGC/TMS/2025_NEW.ANALYSIS/METHYLKIT.FILES.TMS"
 
 # Non-imputed GDS files — imputed GDS is used only in step 11ab
