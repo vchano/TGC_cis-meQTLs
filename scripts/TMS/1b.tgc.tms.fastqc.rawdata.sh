@@ -1,0 +1,60 @@
+#!/bin/bash
+#-------------------------------------------------------------------------------
+# TreeGeneClimate (TGC) — TMS
+# Step 1b: FASTQC + MULTIQC on RAW FASTQ (TMS)
+#
+# Project root:
+#   /path/to/your/project
+#
+# Input (data, frozen):
+#   DATA/TMS/RAWDATA.TMS/*.fastq.gz
+#
+# Output (results):
+#   RESULTS/TMS/QC/RAWDATA/FASTQC/
+#   RESULTS/TMS/QC/RAWDATA/MULTIQC/
+#-------------------------------------------------------------------------------
+
+#SBATCH -n 48
+#SBATCH -N 1
+#SBATCH --job-name=TMS.FQC1
+#SBATCH --output=LOGS/%x_%j.out
+#SBATCH --error=LOGS/%x_%j.err
+#SBATCH --ntasks-per-socket 24
+#SBATCH --time=48:00:00
+
+set -euo pipefail
+
+echo "[$(date)] SLURM job started: ${SLURM_JOB_NAME:-no_slurm}"
+
+module load fastqc/0.11.4
+module load anaconda3/2020.11
+
+# === USER CONFIGURATION ===
+PROJECT_ROOT="${TGC_PROJECT_ROOT:-/path/to/your/project}"
+# ===========================
+
+INPUT="${PROJECT_ROOT}/DATA/TMS/RAWDATA.TMS"
+
+QC_BASE="${PROJECT_ROOT}/RESULTS/TMS/QC/RAWDATA"
+QC_FASTQC="${QC_BASE}/FASTQC"
+QC_MULTIQC="${QC_BASE}/MULTIQC"
+
+LOGS="${PROJECT_ROOT}/LOGS"
+mkdir -p "${QC_FASTQC}" "${QC_MULTIQC}" "${LOGS}"
+
+shopt -s nullglob
+raw_fastq=( "${INPUT}"/*.fastq.gz )
+if (( ${#raw_fastq[@]} == 0 )); then
+  echo "ERROR: no FASTQ found in: ${INPUT}"
+  exit 1
+fi
+
+fastqc "${raw_fastq[@]}" --outdir "${QC_FASTQC}" --threads 48
+
+source activate multiqc
+multiqc "${QC_FASTQC}" -o "${QC_MULTIQC}"
+conda deactivate
+
+echo "[$(date)] Done."
+exit 0
+
